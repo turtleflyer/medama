@@ -1,0 +1,7 @@
+coverage
+.eslint*
+.git*
+*prettier*
+.vscode
+jest*
+tsconfig.*
