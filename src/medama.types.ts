@@ -44,9 +44,7 @@ export type Medama<State extends object> = MedamaMethods<State> & {
 };
 
 export type CreateMedama = {
-  <State extends object>(): Normalize<Medama<State>>;
-
   <State extends object>(initState: State): Normalize<Medama<State>>;
 
-  <State extends object>(initState: Partial<State>): Normalize<Medama<State>>;
+  <State extends object>(initState?: Partial<State>): Normalize<Medama<State>>;
 };

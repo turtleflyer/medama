@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { ReadState, Selector } from './medama.types';
 import { createSelectorRecord, createSelectorStore } from './selectorStore';
 

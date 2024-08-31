@@ -181,6 +181,7 @@ export const createRegisterTriggerJob = (selectorTrigger: SelectorTrigger) =>
       },
 
       triggerJob: ({ runUnregister }) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         selectorTrigger() || runUnregister();
       },
 
