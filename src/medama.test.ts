@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-empty-function */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createMedama, type CreateMedama } from '.';
+import { createMedama } from '.';
+import type { CreateMedama } from './medama.types';
 
 const symbKey = Symbol('symbKey');
 

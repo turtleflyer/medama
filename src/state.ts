@@ -31,9 +31,7 @@ type ProxyHandler<State> = {
  * through a Proxy wrapping around it and manages reading and writing only via dedicated methods
  * preventing unauthorized use.
  */
-export const createStateImage = <State extends object, K extends keyof State>(
-  initState?: Pick<State, K>
-) => {
+export const createStateImage = <State extends object>(initState?: Partial<State>) => {
   const { writeState, registerSelectorTrigger } = compose<
     {
       /**

@@ -9,9 +9,7 @@ import type {
 import { createSelectorStore, type SubscribeToStateInSelectorStore } from './selectorStore';
 import { createStateImage, type RegisterSelectorTrigger } from './state';
 
-export const createMedama: CreateMedama = <State extends object, K extends keyof State>(
-  initState?: Pick<State, K>
-) =>
+export const createMedama: CreateMedama = <State extends object>(initState?: Partial<State>) =>
   compose<
     {
       state: {

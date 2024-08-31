@@ -28,9 +28,7 @@ export type SetState<State extends object> = <K extends keyof State>(
   stateChange: Setter<State, K> | Pick<State, K>
 ) => Pick<State, K>;
 
-export type ResetState<State extends object> = <K extends keyof State>(
-  initState?: Pick<State, K>
-) => void;
+export type ResetState<State extends object> = (initState?: Partial<State>) => void;
 
 export type MedamaMethods<State extends object> = {
   subscribeToState: SubscribeToState<State>;

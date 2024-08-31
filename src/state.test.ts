@@ -134,10 +134,11 @@ describe('testing state part', () => {
     let selectorTrigger1 = jest.fn(() => triggerReturn1);
     const selectorTrigger2 = jest.fn(() => triggerReturn2);
 
-    let { registerSelectorTrigger, writeState } = createStateImage<
-      { a: number; 2: string; [symbKey]: boolean },
-      'a' | 2 | typeof symbKey
-    >();
+    let { registerSelectorTrigger, writeState } = createStateImage<{
+      a: number;
+      2: string;
+      [symbKey]: boolean;
+    }>();
 
     let readStateFromImage = registerSelectorTrigger(selectorTrigger1);
 
