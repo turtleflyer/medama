@@ -17,9 +17,7 @@ export type Setter<State extends object, K extends keyof State> = (state: State)
 export type SetState<State extends object> = <K extends keyof State>(
   stateChange: Setter<State, K> | Pick<State, K>
 ) => Pick<State, K>;
-export type ResetState<State extends object> = <K extends keyof State>(
-  initState?: Pick<State, K>
-) => void;
+export type ResetState<State extends object> = (initState?: Partial<State>) => void;
 export type MedamaMethods<State extends object> = {
   subscribeToState: SubscribeToState<State>;
   readState: ReadState<State>;
@@ -30,7 +28,6 @@ export type Medama<State extends object> = MedamaMethods<State> & {
   pupil: MedamaMethods<State>;
 };
 export type CreateMedama = {
-  <State extends object>(): Normalize<Medama<State>>;
   <State extends object>(initState: State): Normalize<Medama<State>>;
-  <State extends object>(initState: Partial<State>): Normalize<Medama<State>>;
+  <State extends object>(initState?: Partial<State>): Normalize<Medama<State>>;
 };

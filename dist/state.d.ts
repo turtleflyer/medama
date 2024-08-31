@@ -12,8 +12,8 @@ export type RegisterSelectorTrigger<State extends object> = (
  * through a Proxy wrapping around it and manages reading and writing only via dedicated methods
  * preventing unauthorized use.
  */
-export declare const createStateImage: <State extends object, K extends keyof State>(
-  initState?: Pick<State, K>
+export declare const createStateImage: <State extends object>(
+  initState?: Partial<State>
 ) => {
   writeState: (toWrite: Partial<State>) => void;
   registerSelectorTrigger: RegisterSelectorTrigger<State>;

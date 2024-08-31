@@ -80,6 +80,7 @@ export const createRegisterTriggerJob = (selectorTrigger) =>
         });
       },
       triggerJob: ({ runUnregister }) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         selectorTrigger() || runUnregister();
       },
       runUnregister: ({ unregisterPool }) => {
