@@ -1,41 +1,44 @@
 'use strict';
 Object.defineProperty(exports, '__esModule', { value: true });
 exports.createSelectorRecord = exports.createSelectorStore = void 0;
-const alnico_1 = require('alnico');
 /**
  * The selector store manages the map of each selector to its record that is methods allowing to get
  * the most updated value and manage subscriptions. The map is a WeakMap that allow garbage
  * collecting if all references to the selector was gone.
  */
 const createSelectorStore = (registerSelectorTrigger) => {
-  const { getSelectorValue, subscribeToStateInSelectorStore } = (0, alnico_1.compose)(
-    {},
-    {
-      getSelectorValue: ({ getSelectorRecord }, selector) => {
-        const { getValue } = getSelectorRecord(selector);
-        return getValue();
-      },
-      subscribeToStateInSelectorStore: ({ getSelectorRecord }, selector, subscription) => {
-        const { addSubscription, getValue } = getSelectorRecord(selector);
-        const possibleSubscriptionJob = subscription(getValue());
-        return addSubscription(
-          possibleSubscriptionJob !== null && possibleSubscriptionJob !== void 0
-            ? possibleSubscriptionJob
-            : subscription
-        );
-      },
-      getSelectorRecord: ({ selectorSubscriptionStore }, selector) => {
-        var _a;
-        const selectorRecord =
-          (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0
-            ? _a
-            : (0, exports.createSelectorRecord)(selector, registerSelectorTrigger);
-        selectorSubscriptionStore.set(selector, selectorRecord);
-        return selectorRecord;
-      },
-    },
-    { selectorSubscriptionStore: new WeakMap() }
-  );
+  const selectorSubscriptionStore = new WeakMap();
+  const getSelectorValue = (selector) => {
+    const getSelectorRecord = (selector) => {
+      var _a;
+      const selectorRecord =
+        (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0
+          ? _a
+          : (0, exports.createSelectorRecord)(selector, registerSelectorTrigger);
+      selectorSubscriptionStore.set(selector, selectorRecord);
+      return selectorRecord;
+    };
+    const { getValue } = getSelectorRecord(selector);
+    return getValue();
+  };
+  const getSelectorRecord = (selector) => {
+    var _a;
+    const selectorRecord =
+      (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0
+        ? _a
+        : (0, exports.createSelectorRecord)(selector, registerSelectorTrigger);
+    selectorSubscriptionStore.set(selector, selectorRecord);
+    return selectorRecord;
+  };
+  const subscribeToStateInSelectorStore = (selector, subscription) => {
+    const { addSubscription, getValue } = getSelectorRecord(selector);
+    const possibleSubscriptionJob = subscription(getValue());
+    return addSubscription(
+      possibleSubscriptionJob !== null && possibleSubscriptionJob !== void 0
+        ? possibleSubscriptionJob
+        : subscription
+    );
+  };
   return { getSelectorValue, subscribeToStateInSelectorStore };
 };
 exports.createSelectorStore = createSelectorStore;
@@ -45,64 +48,63 @@ exports.createSelectorStore = createSelectorStore;
  * preventing the unnecessary recalculating that.
  */
 const createSelectorRecord = (selector, registerSelectorTrigger) => {
-  const { addSubscription, getValue } = (0, alnico_1.compose)(
-    {
-      /**
-       * The result value for the selector is set to be calculated lazily preventing unnecessary
-       * recalculating.
-       */
-      value: (0, alnico_1.lazily)(({ calculateValue }) => calculateValue()),
-      /**
-       * Indicates if the selector is currently registered.
-       */
-      registered: true,
-    },
-    {
-      addSubscription({ jobs }, subscriptionJob) {
-        jobs.add(subscriptionJob);
-        return () => {
-          jobs.delete(subscriptionJob);
-        };
-      },
-      getValue: ({ value, registered, selectorTrigger }) => {
-        /**
-         * If on reading the selector value it appears that the selector is unregistered it gets
-         * registered right away even if there are no jobs (it will be unregistered on the next
-         * update of the selector's dependencies) to make sure the next reading will recalculate the
-         * value only if it was updated.
-         */
-        if (!registered.get()) {
-          registerSelectorTrigger(selectorTrigger);
-          registered.set(true);
-        }
-        return value.get();
-      },
-      selectorTrigger: ({ jobs, value, registered, calculateValue }) => {
-        /**
-         * If the job list is empty it sends the states image the signal to remove the trigger.
-         */
-        if (jobs.size === 0) {
-          value.set((0, alnico_1.lazily)(({ calculateValue }) => calculateValue()));
-          registered.set(false);
-          return false;
-        }
-        const calculatedValue = calculateValue();
-        value.set(calculatedValue);
-        jobs.forEach((job) => {
-          job(calculatedValue);
-        });
-        return true;
-      },
-    },
-    Object.assign(
-      { jobs: new Set() },
-      (0, alnico_1.lazily)(({ selectorTrigger, registered }) => {
-        const readState = registerSelectorTrigger(selectorTrigger);
-        registered.set(true);
-        return { calculateValue: () => readState(selector) };
-      })
-    )
-  );
+  /**
+   * The result value for the selector is set to be calculated lazily preventing unnecessary
+   * recalculating.
+   */
+  let value;
+  let toRecalculateValue = true;
+  /**
+   * Indicates if the selector is currently registered.
+   */
+  let registered = true;
+  /**
+   * Jobs are getting run when the selector's dependencies change.
+   */
+  const jobs = new Set();
+  const calculateValue = () => readState(selector);
+  const addSubscription = (subscriptionJob) => {
+    jobs.add(subscriptionJob);
+    return () => {
+      jobs.delete(subscriptionJob);
+    };
+  };
+  const getValue = () => {
+    /**
+     * If on reading the selector value it appears that the selector is unregistered it gets
+     * registered right away even if there are no jobs (it will be unregistered on the next
+     * update of the selector's dependencies) to make sure the next reading will recalculate the
+     * value only if it was updated.
+     */
+    if (!registered) {
+      registerSelectorTrigger(selectorTrigger);
+      registered = true;
+    }
+    toRecalculateValue && (value = calculateValue());
+    toRecalculateValue = false;
+    return value;
+  };
+  /**
+   * A handler that gets triggered when some of selector's dependencies were updated. It is
+   * passed to the `registerSelectorTrigger` from the state image when the selector is being
+   * registered.
+   */
+  const selectorTrigger = () => {
+    /**
+     * If the job list is empty it sends the states image the signal to remove the trigger.
+     */
+    if (jobs.size === 0) {
+      toRecalculateValue = true;
+      registered = false;
+      return false;
+    }
+    value = calculateValue();
+    jobs.forEach((job) => {
+      job(value);
+    });
+    return true;
+  };
+  const readState = registerSelectorTrigger(selectorTrigger);
   return { addSubscription, getValue };
 };
 exports.createSelectorRecord = createSelectorRecord;

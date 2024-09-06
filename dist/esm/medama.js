@@ -1,64 +1,45 @@
-import { compose, lazily } from 'alnico';
 import { createSelectorStore } from './selectorStore';
 import { createStateImage } from './state';
-export const createMedama = (initState) =>
-  compose(
-    {
-      state: createStateImage(initState),
-      selectorStore: lazily(({ state }) =>
-        createSelectorStore(state.get().registerSelectorTrigger)
-      ),
-    },
-    {
-      subscribeToState: ({ selectorStore }, selector, subscription) => {
-        const toReturn = createResubscribeStore((sub) =>
-          selectorStore.get().subscribeToStateInSelectorStore(selector, sub)
-        );
-        toReturn.resubscribe(subscription);
-        return toReturn;
-      },
-      readState: ({ selectorStore }, selector) => selectorStore.get().getSelectorValue(selector),
-      setState: ({ state, selectorStore }, stateChange) => {
-        const mergeToState =
-          typeof stateChange === 'function'
-            ? selectorStore.get().getSelectorValue(stateChange)
-            : stateChange;
-        state.get().writeState(mergeToState);
-        return mergeToState;
-      },
-      resetState: ({ state, selectorStore }, initState) => {
-        const newState = createStateImage(initState);
-        const newSelectorStore = createSelectorStore(newState.registerSelectorTrigger);
-        state.set(newState);
-        selectorStore.set(newSelectorStore);
-      },
-    },
-    {
-      pupil: lazily(({ subscribeToState, readState, setState, resetState }) => ({
-        subscribeToState,
-        readState,
-        setState,
-        resetState,
-      })),
-    }
-  );
-const createResubscribeStore = (subscribe) =>
-  compose(
-    {
-      unsubscribeFromRecentSubscription: null,
-    },
-    {
-      unsubscribe: ({ unsubscribeFromRecentSubscription }) => {
-        var _a;
-        (_a = unsubscribeFromRecentSubscription.exc(null)) === null || _a === void 0
-          ? void 0
-          : _a();
-      },
-      resubscribe: ({ unsubscribeFromRecentSubscription }, subscription) => {
-        var _a;
-        (_a = unsubscribeFromRecentSubscription.get()) === null || _a === void 0 ? void 0 : _a();
-        unsubscribeFromRecentSubscription.set(subscribe(subscription));
-      },
-    }
-  );
+export const createMedama = (initState) => {
+  let state = createStateImage(initState);
+  let selectorStore = createSelectorStore(state.registerSelectorTrigger);
+  const subscribeToState = (selector, subscription) => {
+    const toReturn = createResubscribeStore((sub) =>
+      selectorStore.subscribeToStateInSelectorStore(selector, sub)
+    );
+    toReturn.resubscribe(subscription);
+    return toReturn;
+  };
+  const readState = (selector) => selectorStore.getSelectorValue(selector);
+  const setState = (stateChange) => {
+    const mergeToState =
+      typeof stateChange === 'function' ? selectorStore.getSelectorValue(stateChange) : stateChange;
+    state.writeState(mergeToState);
+    return mergeToState;
+  };
+  const resetState = (initState) => {
+    const newState = createStateImage(initState);
+    const newSelectorStore = createSelectorStore(newState.registerSelectorTrigger);
+    state = newState;
+    selectorStore = newSelectorStore;
+  };
+  const pupil = { subscribeToState, resetState, setState, readState };
+  return Object.assign(Object.assign({}, pupil), { pupil });
+};
+const createResubscribeStore = (subscribe) => {
+  let unsubscribeFromRecentSubscription = null;
+  const unsubscribe = () => {
+    unsubscribeFromRecentSubscription === null || unsubscribeFromRecentSubscription === void 0
+      ? void 0
+      : unsubscribeFromRecentSubscription();
+    unsubscribeFromRecentSubscription = null;
+  };
+  const resubscribe = (subscription) => {
+    unsubscribeFromRecentSubscription === null || unsubscribeFromRecentSubscription === void 0
+      ? void 0
+      : unsubscribeFromRecentSubscription();
+    unsubscribeFromRecentSubscription = subscribe(subscription);
+  };
+  return { unsubscribe, resubscribe };
+};
 //# sourceMappingURL=medama.js.map

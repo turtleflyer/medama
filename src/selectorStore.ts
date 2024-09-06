@@ -1,17 +1,5 @@
-import { compose, lazily } from 'alnico';
-import type {
-  ReadState,
-  Selector,
-  Subscription,
-  SubscriptionJob,
-  UnsubscribeFromState,
-} from './medama.types';
-import type { RegisterSelectorTrigger, SelectorTrigger } from './state';
-
-export type SubscribeToStateInSelectorStore<State extends object> = <V>(
-  selector: Selector<State, V>,
-  subscription: Subscription<V>
-) => UnsubscribeFromState;
+import type { Selector, Subscription, SubscriptionJob } from './medama.types';
+import type { RegisterSelectorTrigger } from './state';
 
 /**
  * The selector store manages the map of each selector to its record that is methods allowing to get
@@ -21,52 +9,59 @@ export type SubscribeToStateInSelectorStore<State extends object> = <V>(
 export const createSelectorStore = <State extends object>(
   registerSelectorTrigger: RegisterSelectorTrigger<State>
 ) => {
-  const { getSelectorValue, subscribeToStateInSelectorStore } = compose<
-    {},
-    {
-      getSelectorValue: ReadState<State>;
-      subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State>;
-      getSelectorRecord: <V>(selector: Selector<State, V>) => SelectorRecord<V>;
-    },
-    {
-      selectorSubscriptionStore: WeakMap<Selector<State, unknown>, SelectorRecord<unknown>>;
-    }
-  >(
-    {},
+  const selectorSubscriptionStore = new WeakMap<
+    Selector<State, unknown>,
+    SelectorRecord<unknown>
+  >();
 
-    {
-      getSelectorValue: ({ getSelectorRecord }, selector) => {
-        const { getValue } = getSelectorRecord(selector);
+  const getSelectorValue: {
+    <V>(selector: Selector<State, V>): V;
+    (selector: Selector<State, unknown>): unknown;
+  } = (selector: Selector<State, unknown>) => {
+    const getSelectorRecord = <V>(selector: Selector<State, V>) => {
+      const selectorRecord =
+        selectorSubscriptionStore.get(selector) ??
+        createSelectorRecord(selector, registerSelectorTrigger);
 
-        return getValue();
-      },
+      selectorSubscriptionStore.set(selector, selectorRecord);
 
-      subscribeToStateInSelectorStore: ({ getSelectorRecord }, selector, subscription) => {
-        const { addSubscription, getValue } = getSelectorRecord(selector);
-        const possibleSubscriptionJob = subscription(getValue());
+      return selectorRecord;
+    };
+    const { getValue } = getSelectorRecord(selector);
 
-        return addSubscription(possibleSubscriptionJob ?? subscription);
-      },
+    return getValue();
+  };
 
-      getSelectorRecord: ({ selectorSubscriptionStore }, selector) => {
-        const selectorRecord =
-          selectorSubscriptionStore.get(selector) ??
-          createSelectorRecord(selector, registerSelectorTrigger);
+  const getSelectorRecord: {
+    <V>(selector: Selector<State, V>): SelectorRecord<V>;
+    (selector: Selector<State, unknown>): SelectorRecord<unknown>;
+  } = (selector: Selector<State, unknown>) => {
+    const selectorRecord =
+      selectorSubscriptionStore.get(selector) ??
+      createSelectorRecord(selector, registerSelectorTrigger);
 
-        selectorSubscriptionStore.set(selector, selectorRecord);
+    selectorSubscriptionStore.set(selector, selectorRecord);
 
-        return selectorRecord;
-      },
-    },
+    return selectorRecord;
+  };
 
-    { selectorSubscriptionStore: new WeakMap() }
-  );
+  const subscribeToStateInSelectorStore = <V>(
+    selector: Selector<State, V>,
+    subscription: Subscription<V>
+  ) => {
+    const { addSubscription, getValue } = getSelectorRecord<V>(selector);
+    const possibleSubscriptionJob = subscription(getValue());
+
+    return addSubscription(possibleSubscriptionJob ?? subscription);
+  };
 
   return { getSelectorValue, subscribeToStateInSelectorStore };
 };
 
+type AddSubscription<V> = (subscriptionJob: SubscriptionJob<V>) => () => void;
+
 type SelectorRecord<V> = {
-  addSubscription: (subscriptionJob: SubscriptionJob<V>) => () => void;
+  addSubscription: AddSubscription<V>;
   getValue: () => V;
 };
 
@@ -79,94 +74,76 @@ export const createSelectorRecord = <State extends object, V>(
   selector: Selector<State, V>,
   registerSelectorTrigger: RegisterSelectorTrigger<State>
 ) => {
-  const { addSubscription, getValue } = compose<
-    { value: V; registered: boolean },
-    SelectorRecord<V> & {
-      /**
-       * A handler that gets triggered when some of selector's dependencies were updated. It is
-       * passed to the `registerSelectorTrigger` from the state image when the selector is being
-       * registered.
-       */
-      selectorTrigger: SelectorTrigger;
-    },
-    {
-      /**
-       * Jobs are getting run when the selector's dependencies change.
-       */
-      jobs: Set<SubscriptionJob<V>>;
-      calculateValue: () => V;
+  /**
+   * The result value for the selector is set to be calculated lazily preventing unnecessary
+   * recalculating.
+   */
+  let value: V;
+  let toRecalculateValue = true;
+
+  /**
+   * Indicates if the selector is currently registered.
+   */
+  let registered = true;
+
+  /**
+   * Jobs are getting run when the selector's dependencies change.
+   */
+  const jobs = new Set<SubscriptionJob<V>>();
+  const calculateValue = () => readState(selector);
+
+  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
+    jobs.add(subscriptionJob);
+
+    return () => {
+      jobs.delete(subscriptionJob);
+    };
+  };
+
+  const getValue = () => {
+    /**
+     * If on reading the selector value it appears that the selector is unregistered it gets
+     * registered right away even if there are no jobs (it will be unregistered on the next
+     * update of the selector's dependencies) to make sure the next reading will recalculate the
+     * value only if it was updated.
+     */
+    if (!registered) {
+      registerSelectorTrigger(selectorTrigger);
+      registered = true;
     }
-  >(
-    {
-      /**
-       * The result value for the selector is set to be calculated lazily preventing unnecessary
-       * recalculating.
-       */
-      value: lazily(({ calculateValue }) => calculateValue()),
 
-      /**
-       * Indicates if the selector is currently registered.
-       */
-      registered: true,
-    },
+    toRecalculateValue && (value = calculateValue());
+    toRecalculateValue = false;
 
-    {
-      addSubscription({ jobs }, subscriptionJob) {
-        jobs.add(subscriptionJob);
+    return value;
+  };
 
-        return () => {
-          jobs.delete(subscriptionJob);
-        };
-      },
+  /**
+   * A handler that gets triggered when some of selector's dependencies were updated. It is
+   * passed to the `registerSelectorTrigger` from the state image when the selector is being
+   * registered.
+   */
+  const selectorTrigger = () => {
+    /**
+     * If the job list is empty it sends the states image the signal to remove the trigger.
+     */
+    if (jobs.size === 0) {
+      toRecalculateValue = true;
+      registered = false;
 
-      getValue: ({ value, registered, selectorTrigger }) => {
-        /**
-         * If on reading the selector value it appears that the selector is unregistered it gets
-         * registered right away even if there are no jobs (it will be unregistered on the next
-         * update of the selector's dependencies) to make sure the next reading will recalculate the
-         * value only if it was updated.
-         */
-        if (!registered.get()) {
-          registerSelectorTrigger(selectorTrigger);
-          registered.set(true);
-        }
-
-        return value.get();
-      },
-
-      selectorTrigger: ({ jobs, value, registered, calculateValue }) => {
-        /**
-         * If the job list is empty it sends the states image the signal to remove the trigger.
-         */
-        if (jobs.size === 0) {
-          value.set(lazily(({ calculateValue }) => calculateValue()));
-          registered.set(false);
-
-          return false;
-        }
-
-        const calculatedValue = calculateValue();
-        value.set(calculatedValue);
-
-        jobs.forEach((job) => {
-          job(calculatedValue);
-        });
-
-        return true;
-      },
-    },
-
-    {
-      jobs: new Set(),
-
-      ...lazily(({ selectorTrigger, registered }) => {
-        const readState = registerSelectorTrigger(selectorTrigger);
-        registered.set(true);
-
-        return { calculateValue: () => readState(selector) };
-      }),
+      return false;
     }
-  );
+
+    value = calculateValue();
+
+    jobs.forEach((job) => {
+      job(value);
+    });
+
+    return true;
+  };
+
+  const readState = registerSelectorTrigger(selectorTrigger);
 
   return { addSubscription, getValue };
 };

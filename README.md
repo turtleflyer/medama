@@ -1,6 +1,6 @@
 # _Medama_
 
-![Medama](medama.png)
+![Medama](./doc/media/medama.png)
 
 _Medama_ is a minimalist yet powerful universal reactive state management library crafted in
 _TypeScript_. It boasts high performance optimization and efficient garbage collection. At its core,
