@@ -17,6 +17,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+      '@typescript-eslint/no-unused-expressions': 'off',
     },
   }
 );
