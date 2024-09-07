@@ -14,35 +14,20 @@ export const createSelectorStore = <State extends object>(
     SelectorRecord<unknown>
   >();
 
-  const getSelectorValue: {
-    <V>(selector: Selector<State, V>): V;
-    (selector: Selector<State, unknown>): unknown;
-  } = (selector: Selector<State, unknown>) => {
-    const getSelectorRecord = <V>(selector: Selector<State, V>) => {
-      const selectorRecord =
-        selectorSubscriptionStore.get(selector) ??
-        createSelectorRecord(selector, registerSelectorTrigger);
-
-      selectorSubscriptionStore.set(selector, selectorRecord);
-
-      return selectorRecord;
-    };
-    const { getValue } = getSelectorRecord(selector);
-
-    return getValue();
-  };
-
-  const getSelectorRecord: {
-    <V>(selector: Selector<State, V>): SelectorRecord<V>;
-    (selector: Selector<State, unknown>): SelectorRecord<unknown>;
-  } = (selector: Selector<State, unknown>) => {
+  const getSelectorRecord = <V>(selector: Selector<State, V>) => {
     const selectorRecord =
-      selectorSubscriptionStore.get(selector) ??
+      (selectorSubscriptionStore.get(selector) as SelectorRecord<V>) ??
       createSelectorRecord(selector, registerSelectorTrigger);
 
     selectorSubscriptionStore.set(selector, selectorRecord);
 
     return selectorRecord;
+  };
+
+  const getSelectorValue = <V>(selector: Selector<State, V>) => {
+    const { getValue } = getSelectorRecord(selector);
+
+    return getValue();
   };
 
   const subscribeToStateInSelectorStore = <V>(
