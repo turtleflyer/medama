@@ -1,41 +1,41 @@
-import { createJobPool, createRegisterTriggerJob, createStateImage } from './state';
+import { JobPool, StateImage, TriggerJob } from './state';
 
 const symbKey = Symbol('symbKey');
 
 describe('testing state part', () => {
   test('createJobPool works correctly', () => {
     let jobs = Array.from({ length: 5 }, () => jest.fn());
-    const { addToPool, runPool } = createJobPool();
-    runPool();
+    const jobPool = new JobPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }) => expect(calls).toHaveLength(0));
 
-    addToPool(new Set([jobs[0]]));
-    runPool();
+    jobPool.addToPool(new Set([jobs[0]]));
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }, i) => expect(calls).toHaveLength(i === 0 ? 1 : 0));
 
-    runPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }, i) => expect(calls).toHaveLength(i === 0 ? 1 : 0));
 
     jobs = Array.from({ length: 5 }, () => jest.fn());
-    runPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }) => expect(calls).toHaveLength(0));
 
-    addToPool(new Set(jobs));
-    runPool();
+    jobPool.addToPool(new Set(jobs));
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }) => expect(calls).toHaveLength(1));
 
-    runPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }) => expect(calls).toHaveLength(1));
 
     jobs = Array.from({ length: 5 }, () => jest.fn());
-    runPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }) => expect(calls).toHaveLength(0));
 
-    addToPool(new Set(jobs.slice(2)));
-    runPool();
+    jobPool.addToPool(new Set(jobs.slice(2)));
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }, i) => expect(calls).toHaveLength(i < 2 ? 0 : 1));
 
-    runPool();
+    jobPool.runPool();
     jobs.every(({ mock: { calls } }, i) => expect(calls).toHaveLength(i < 2 ? 0 : 1));
   });
 
@@ -46,14 +46,14 @@ describe('testing state part', () => {
     let selectorTrigger2 = jest.fn(() => triggerReturn2);
     const triggerJobSet1 = new Set<() => void>();
     const triggerJobSet2 = new Set<() => void>();
-    let registerTriggerJob1 = createRegisterTriggerJob(selectorTrigger1);
-    let registerTriggerJob2 = createRegisterTriggerJob(selectorTrigger2);
+    let triggerJob1 = new TriggerJob(selectorTrigger1);
+    let triggerJob2 = new TriggerJob(selectorTrigger2);
     expect(triggerJobSet1.size).toBe(0);
 
-    registerTriggerJob1(triggerJobSet1);
+    triggerJob1.registerTriggerJob(triggerJobSet1);
     expect(triggerJobSet1.size).toBe(1);
 
-    registerTriggerJob2(triggerJobSet1);
+    triggerJob2.registerTriggerJob(triggerJobSet1);
     expect(triggerJobSet1.size).toBe(2);
 
     triggerJobSet1.forEach((job) => {
@@ -88,11 +88,11 @@ describe('testing state part', () => {
     triggerReturn2 = true;
     selectorTrigger1 = jest.fn(() => triggerReturn1);
     selectorTrigger2 = jest.fn(() => triggerReturn2);
-    registerTriggerJob1 = createRegisterTriggerJob(selectorTrigger1);
-    registerTriggerJob2 = createRegisterTriggerJob(selectorTrigger2);
-    registerTriggerJob1(triggerJobSet1);
-    registerTriggerJob1(triggerJobSet2);
-    registerTriggerJob2(triggerJobSet2);
+    triggerJob1 = new TriggerJob(selectorTrigger1);
+    triggerJob2 = new TriggerJob(selectorTrigger2);
+    triggerJob1.registerTriggerJob(triggerJobSet1);
+    triggerJob1.registerTriggerJob(triggerJobSet2);
+    triggerJob2.registerTriggerJob(triggerJobSet2);
     expect(triggerJobSet1.size).toBe(1);
     expect(triggerJobSet2.size).toBe(2);
 
@@ -134,78 +134,78 @@ describe('testing state part', () => {
     let selectorTrigger1 = jest.fn(() => triggerReturn1);
     const selectorTrigger2 = jest.fn(() => triggerReturn2);
 
-    let { registerSelectorTrigger, writeState } = createStateImage<{
+    let stateImage = new StateImage<{
       a: number;
       2: string;
       [symbKey]: boolean;
     }>();
 
-    let readStateFromImage = registerSelectorTrigger(selectorTrigger1);
+    let readStateFromImage = stateImage.registerSelectorTrigger(selectorTrigger1);
 
     expect(readStateFromImage((state) => state.a)).toBeUndefined();
     expect(readStateFromImage((state) => state[2])).toBeUndefined();
     expect(readStateFromImage((state) => state[symbKey])).toBeUndefined();
 
-    ({ registerSelectorTrigger, writeState } = createStateImage({
+    stateImage = new StateImage({
       a: 21,
       2: 'abc',
       [symbKey]: false,
-    }));
+    });
 
-    readStateFromImage = registerSelectorTrigger(selectorTrigger1);
+    readStateFromImage = stateImage.registerSelectorTrigger(selectorTrigger1);
 
     expect(readStateFromImage((state) => state.a)).toBe(21);
     expect(readStateFromImage((state) => state[2])).toBe('abc');
     expect(readStateFromImage((state) => state[symbKey])).toBe(false);
     expect(selectorTrigger1.mock.calls).toHaveLength(0);
 
-    writeState({ a: 33, 2: 'fff', [symbKey]: true });
+    stateImage.writeState({ a: 33, 2: 'fff', [symbKey]: true });
     expect(readStateFromImage((state) => state.a)).toBe(33);
     expect(readStateFromImage((state) => state[2])).toBe('fff');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
     expect(selectorTrigger1.mock.calls).toHaveLength(1);
 
-    writeState({ 2: 'eee', [symbKey]: false });
+    stateImage.writeState({ 2: 'eee', [symbKey]: false });
     expect(readStateFromImage((state) => state.a)).toBe(33);
     expect(readStateFromImage((state) => state[2])).toBe('eee');
     expect(readStateFromImage((state) => state[symbKey])).toBe(false);
     expect(selectorTrigger1.mock.calls).toHaveLength(1);
 
-    writeState({ a: 33, 2: 'ddd', [symbKey]: true });
+    stateImage.writeState({ a: 33, 2: 'ddd', [symbKey]: true });
     expect(readStateFromImage((state) => state.a)).toBe(33);
     expect(readStateFromImage((state) => state[2])).toBe('ddd');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
     expect(selectorTrigger1.mock.calls).toHaveLength(1);
 
-    writeState({ a: 100, 2: 'ddd', [symbKey]: true });
+    stateImage.writeState({ a: 100, 2: 'ddd', [symbKey]: true });
     expect(readStateFromImage((state) => state.a)).toBe(100);
     expect(readStateFromImage((state) => state[2])).toBe('ddd');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
     expect(selectorTrigger1.mock.calls).toHaveLength(2);
 
     triggerReturn1 = false;
-    writeState({ a: 12 });
+    stateImage.writeState({ a: 12 });
     expect(readStateFromImage((state) => state.a)).toBe(12);
     expect(selectorTrigger1.mock.calls).toHaveLength(3);
 
-    writeState({ a: 44 });
+    stateImage.writeState({ a: 44 });
     expect(readStateFromImage((state) => state.a)).toBe(44);
     expect(selectorTrigger1.mock.calls).toHaveLength(3);
 
     triggerReturn1 = true;
     selectorTrigger1 = jest.fn(() => triggerReturn1);
-    registerSelectorTrigger(selectorTrigger1);
+    stateImage.registerSelectorTrigger(selectorTrigger1);
     readStateFromImage(({ a, [symbKey]: s }) => ({ a, s }));
-    registerSelectorTrigger(selectorTrigger2);
+    stateImage.registerSelectorTrigger(selectorTrigger2);
     readStateFromImage(({ 2: two }) => two);
-    writeState({ a: 33, 2: 'fff', [symbKey]: true });
+    stateImage.writeState({ a: 33, 2: 'fff', [symbKey]: true });
     expect(readStateFromImage((state) => state.a)).toBe(33);
     expect(readStateFromImage((state) => state[2])).toBe('fff');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
     expect(selectorTrigger1.mock.calls).toHaveLength(1);
     expect(selectorTrigger2.mock.calls).toHaveLength(1);
 
-    writeState({ a: 45, 2: 'ooo' });
+    stateImage.writeState({ a: 45, 2: 'ooo' });
     expect(readStateFromImage((state) => state.a)).toBe(45);
     expect(readStateFromImage((state) => state[2])).toBe('ooo');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
@@ -213,21 +213,21 @@ describe('testing state part', () => {
     expect(selectorTrigger2.mock.calls).toHaveLength(2);
 
     triggerReturn2 = false;
-    writeState({ a: 45, [symbKey]: false });
+    stateImage.writeState({ a: 45, [symbKey]: false });
     expect(readStateFromImage((state) => state.a)).toBe(45);
     expect(readStateFromImage((state) => state[2])).toBe('ooo');
     expect(readStateFromImage((state) => state[symbKey])).toBe(false);
     expect(selectorTrigger1.mock.calls).toHaveLength(3);
     expect(selectorTrigger2.mock.calls).toHaveLength(2);
 
-    writeState({ a: 17, 2: 'yyy' });
+    stateImage.writeState({ a: 17, 2: 'yyy' });
     expect(readStateFromImage((state) => state.a)).toBe(17);
     expect(readStateFromImage((state) => state[2])).toBe('yyy');
     expect(readStateFromImage((state) => state[symbKey])).toBe(false);
     expect(selectorTrigger1.mock.calls).toHaveLength(4);
     expect(selectorTrigger2.mock.calls).toHaveLength(3);
 
-    writeState({ 2: 'qqq' });
+    stateImage.writeState({ 2: 'qqq' });
     expect(readStateFromImage((state) => state.a)).toBe(17);
     expect(readStateFromImage((state) => state[2])).toBe('qqq');
     expect(readStateFromImage((state) => state[symbKey])).toBe(false);
@@ -235,14 +235,14 @@ describe('testing state part', () => {
     expect(selectorTrigger2.mock.calls).toHaveLength(3);
 
     triggerReturn1 = false;
-    writeState({ 2: 'ttt', [symbKey]: true });
+    stateImage.writeState({ 2: 'ttt', [symbKey]: true });
     expect(readStateFromImage((state) => state.a)).toBe(17);
     expect(readStateFromImage((state) => state[2])).toBe('ttt');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);
     expect(selectorTrigger1.mock.calls).toHaveLength(5);
     expect(selectorTrigger2.mock.calls).toHaveLength(3);
 
-    writeState({ a: 88 });
+    stateImage.writeState({ a: 88 });
     expect(readStateFromImage((state) => state.a)).toBe(88);
     expect(readStateFromImage((state) => state[2])).toBe('ttt');
     expect(readStateFromImage((state) => state[symbKey])).toBe(true);

@@ -1,5 +1,8 @@
 # _Medama_
 
+This version of README do not reflect the implementation of medama. It is rewrote using classes and
+OOP principles.
+
 ![Medama](medama.png)
 
 _Medama_ is a minimalist yet powerful universal reactive state management library crafted in

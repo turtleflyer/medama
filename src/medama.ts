@@ -1,94 +1,63 @@
-import { compose, lazily } from 'alnico';
-import type {
-  CreateMedama,
-  MedamaMethods,
-  ReadState,
-  Subscription,
-  SubscriptionMethods,
-} from './medama.types';
-import { createSelectorStore, type SubscribeToStateInSelectorStore } from './selectorStore';
-import { createStateImage, type RegisterSelectorTrigger } from './state';
+import type { Selector, Setter, Subscription } from './medama.types';
+import { SelectorStore } from './selectorStore';
+import { StateImage } from './state';
 
-export const createMedama: CreateMedama = <State extends object>(initState?: Partial<State>) =>
-  compose<
-    {
-      state: {
-        writeState: (toWrite: Partial<State>) => void;
-        registerSelectorTrigger: RegisterSelectorTrigger<State>;
-      };
+export class Medama<State extends object> {
+  constructor(initState?: State);
 
-      selectorStore: {
-        getSelectorValue: ReadState<State>;
-        subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State>;
-      };
-    },
-    MedamaMethods<State>,
-    { pupil: MedamaMethods<State> }
-  >(
-    {
-      state: createStateImage(initState),
+  constructor(initState?: Partial<State>) {
+    this.stateImage = new StateImage(initState);
+    this.selectorStore = new SelectorStore(this.stateImage);
+  }
 
-      selectorStore: lazily(({ state }) =>
-        createSelectorStore(state.get().registerSelectorTrigger)
-      ),
-    },
+  private stateImage: StateImage<State>;
+  private selectorStore: SelectorStore<State>;
 
-    {
-      subscribeToState: ({ selectorStore }, selector, subscription) => {
-        const toReturn = createResubscribeStore((sub) =>
-          selectorStore.get().subscribeToStateInSelectorStore(selector, sub)
-        );
+  subscribeToState<V>(selector: Selector<State, V>, subscription: Subscription<V>) {
+    const toReturn = new ManageSubscription((sub: Subscription<V>) =>
+      this.selectorStore.subscribeToStateInSelectorStore(selector, sub)
+    );
 
-        toReturn.resubscribe(subscription);
+    toReturn.resubscribe(subscription);
 
-        return toReturn;
-      },
+    return toReturn;
+  }
 
-      readState: ({ selectorStore }, selector) => selectorStore.get().getSelectorValue(selector),
+  readState<V>(selector: Selector<State, V>) {
+    return this.selectorStore.getSelectorValue(selector);
+  }
 
-      setState: ({ state, selectorStore }, stateChange) => {
-        const mergeToState =
-          typeof stateChange === 'function'
-            ? selectorStore.get().getSelectorValue(stateChange)
-            : stateChange;
+  setState<K extends keyof State>(stateChange: Setter<State, K> | Pick<State, K>) {
+    const mergeToState =
+      typeof stateChange === 'function'
+        ? this.selectorStore.getSelectorValue(stateChange)
+        : stateChange;
 
-        state.get().writeState(mergeToState);
+    this.stateImage.writeState(mergeToState);
 
-        return mergeToState;
-      },
+    return mergeToState;
+  }
 
-      resetState: ({ state, selectorStore }, initState) => {
-        const newState = createStateImage(initState);
-        const newSelectorStore = createSelectorStore(newState.registerSelectorTrigger);
-        state.set(newState);
-        selectorStore.set(newSelectorStore);
-      },
-    },
+  resetState(initState?: Partial<State>) {
+    this.stateImage = new StateImage(initState);
+    this.selectorStore = new SelectorStore(this.stateImage);
+  }
+}
 
-    {
-      pupil: lazily(({ subscribeToState, readState, setState, resetState }) => ({
-        subscribeToState,
-        readState,
-        setState,
-        resetState,
-      })),
-    }
-  );
+class ManageSubscription<V> {
+  constructor(subscribe: (subscription: Subscription<V>) => () => void) {
+    this.resubscribe = (subscription: Subscription<V>) => {
+      this.unsubscribeFromRecentSubscription?.();
+      this.unsubscribeFromRecentSubscription = subscribe(subscription);
+    };
+  }
 
-const createResubscribeStore = <V>(subscribe: (subscription: Subscription<V>) => () => void) =>
-  compose<{ unsubscribeFromRecentSubscription: (() => void) | null }, SubscriptionMethods<V>>(
-    {
-      unsubscribeFromRecentSubscription: null,
-    },
+  private unsubscribeFromRecentSubscription: (() => void) | null = null;
 
-    {
-      unsubscribe: ({ unsubscribeFromRecentSubscription }) => {
-        unsubscribeFromRecentSubscription.exc(null)?.();
-      },
+  unsubscribe() {
+    this.unsubscribeFromRecentSubscription?.();
+    this.unsubscribeFromRecentSubscription = null;
+  }
 
-      resubscribe: ({ unsubscribeFromRecentSubscription }, subscription) => {
-        unsubscribeFromRecentSubscription.get()?.();
-        unsubscribeFromRecentSubscription.set(subscribe(subscription));
-      },
-    }
-  );
+  resubscribe: (subscription: Subscription<V>) => void;
+}

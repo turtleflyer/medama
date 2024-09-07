@@ -1,5 +1,31 @@
-import { compose, lazily } from 'alnico';
-import type { ReadState } from './medama.types';
+import type { Selector } from './medama.types';
+
+/**
+ * Manages the pool of jobs related to selector triggers. It is populated by the `set` method of the
+ * Proxy wrapping the state object to be ready to run.
+ */
+export class JobPool {
+  private readonly pool = new Set<Set<() => void>>();
+  private readonly haveAlreadyBeenRun = new Set<() => void>();
+
+  addToPool(jobs: Set<() => void>) {
+    this.pool.add(jobs);
+  }
+
+  runPool() {
+    this.pool.forEach((chunk) => {
+      chunk.forEach((job) => {
+        if (this.haveAlreadyBeenRun.has(job)) return;
+
+        job();
+        this.haveAlreadyBeenRun.add(job);
+      });
+    });
+
+    this.pool.clear();
+    this.haveAlreadyBeenRun.clear();
+  }
+}
 
 /**
  * The return of the trigger is an indicator of it being valid. Otherwise it'll be invalidated and
@@ -7,234 +33,142 @@ import type { ReadState } from './medama.types';
  */
 export type SelectorTrigger = () => boolean;
 
-type RunWithRestrictionLifted = <V>(toRun: () => V) => V;
-
-export type RegisterSelectorTrigger<State extends object> = (
-  selectorTrigger: SelectorTrigger
-) => ReadState<State>;
-
-type StateImageMethods<State extends object> = {
-  restrictCalculation: () => void;
-  runWithRestrictionLifted: RunWithRestrictionLifted;
-  readStateFromImage: ReadState<State>;
-  writeState: (toWrite: Partial<State>) => void;
-  registerSelectorTrigger: RegisterSelectorTrigger<State>;
-};
-
 type ProxyHandler<State> = {
   get: <K extends string | symbol>(target: State, p: K) => State[K & keyof State];
   set: <K extends string | symbol>(target: State, p: K, newValue: State[K & keyof State]) => true;
 };
 
 /**
- * The state image is a core flat object holding the state records. It provides an access to them
- * through a Proxy wrapping around it and manages reading and writing only via dedicated methods
- * preventing unauthorized use.
+ * The state image is a class wrapping a core flat object holding the state records. It provides an
+ * access to them through a Proxy wrapping around it and manages reading and writing only via
+ * dedicated methods preventing unauthorized use.
  */
-export const createStateImage = <State extends object>(initState?: Partial<State>) => {
-  const { writeState, registerSelectorTrigger } = compose<
-    {
-      /**
-       * Determines authorized access to the state
-       */
-      calculationAllowed: boolean;
+export class StateImage<State extends object> extends JobPool {
+  constructor(initState?: Partial<State>) {
+    super();
+    this.state = new Proxy({ ...initState } as State, this.proxyHandler);
+  }
 
-      /**
-       * Handler used for registering the selector trigger to establish dependency for the selector.
-       */
-      triggerJobRoutine: RegisterTriggerJob | null;
-    },
-    StateImageMethods<State>,
-    {
-      /**
-       * Used to create a Proxy for the state object being passed to a selector. It has 3 function:
-       * 1. To track the dependency for the selector (registerSelectorTrigger).
-       * 2. To see what state property has a value changed to trigger subscriptions of dependent
-       *    selectors.
-       * 3. Manage authorized access to the state (preventing its capture and using outside the
-       *    selector).
-       */
-      proxyHandler: ProxyHandler<State>;
+  /**
+   * Determines authorized access to the state
+   */
+  private calculationAllowed = false;
 
-      /**
-       * The state object itself constructed through Proxy
-       */
-      state: State;
+  /**
+   * Handler used for registering the selector trigger to establish dependency for the selector.
+   */
+  private triggerJobRoutine: TriggerJob | null = null;
 
-      /**
-       * The map of property keys of the state to the trigger jobs that fires when the value of
-       * corresponding property changes.
-       */
-      triggerJobStore: Partial<Record<keyof State, Set<() => void>>>;
-    } & JobPoolMethods
-  >(
-    { calculationAllowed: false, triggerJobRoutine: null },
+  /**
+   * Used to create a Proxy for the state object being passed to a selector. It has 3 function:
+   * 1. To track the dependency for the selector (registerSelectorTrigger).
+   * 2. To see what state property has a value changed to trigger subscriptions of dependent
+   *    selectors.
+   * 3. Manage authorized access to the state (preventing its capture and using outside the
+   *    selector).
+   */
+  private readonly proxyHandler: ProxyHandler<State> = {
+    get: (target, p) => {
+      this.restrictCalculation();
 
-    {
-      restrictCalculation: ({ calculationAllowed }) => {
-        if (!calculationAllowed.get())
-          throw new Error('Medama Error: The object has no access to its properties');
-      },
+      if (this.triggerJobRoutine?.registerTriggerJob) {
+        const triggerStoreRec = (this.triggerJobStore[p as typeof p & keyof State] ??= new Set());
+        this.triggerJobRoutine.registerTriggerJob(triggerStoreRec);
+      }
 
-      runWithRestrictionLifted: ({ calculationAllowed, triggerJobRoutine }, toRun) => {
-        calculationAllowed.set(true);
-
-        return ([toRun(), calculationAllowed.set(false), triggerJobRoutine.set(null)] as const)[0];
-      },
-
-      readStateFromImage: ({ state, runWithRestrictionLifted }, selector) =>
-        runWithRestrictionLifted(() => selector(state)),
-
-      writeState: ({ state, runWithRestrictionLifted, runPool }, toWrite) => {
-        runWithRestrictionLifted(() => {
-          Object.assign(state, toWrite);
-        });
-
-        runPool();
-      },
-
-      registerSelectorTrigger: ({ readStateFromImage, triggerJobRoutine }, selectorTrigger) => {
-        triggerJobRoutine.set(createRegisterTriggerJob(selectorTrigger));
-
-        return readStateFromImage;
-      },
+      return target[p as typeof p & keyof State];
     },
 
-    {
-      proxyHandler: lazily(
-        ({ restrictCalculation, triggerJobRoutine, triggerJobStore, addToPool }) => ({
-          get: (target, p) => {
-            restrictCalculation();
-            const registerTriggerJob = triggerJobRoutine.get();
+    set: (target, p, newValue) => {
+      this.restrictCalculation();
+      const oldValue = target[p as typeof p & keyof State];
+      target[p as typeof p & keyof State] = newValue;
+      const rec = this.triggerJobStore[p as typeof p & keyof State];
 
-            if (registerTriggerJob) {
-              const triggerStoreRec = (triggerJobStore[p as typeof p & keyof State] ??= new Set());
-              registerTriggerJob(triggerStoreRec);
-            }
+      if (rec && !Object.is(oldValue, newValue)) this.addToPool(rec);
 
-            return target[p as typeof p & keyof State];
-          },
+      return true;
+    },
+  };
 
-          set: (target, p, newValue) => {
-            restrictCalculation();
-            const oldValue = target[p as typeof p & keyof State];
-            target[p as typeof p & keyof State] = newValue;
-            const rec = triggerJobStore[p as typeof p & keyof State];
+  /**
+   * The state object itself constructed through Proxy
+   */
+  private readonly state: State;
 
-            if (rec && !Object.is(oldValue, newValue)) addToPool(rec);
+  /**
+   * The map of property keys of the state to the trigger jobs that fires when the value of
+   * corresponding property changes.
+   */
+  private readonly triggerJobStore: Partial<Record<keyof State, Set<() => void>>> = {};
 
-            return true;
-          },
-        })
-      ),
+  private restrictCalculation() {
+    if (!this.calculationAllowed)
+      throw new Error('Medama Error: The object has no access to its properties');
+  }
 
-      state: lazily(({ proxyHandler }) => new Proxy({ ...initState } as State, proxyHandler)),
+  private runWithRestrictionLifted<V>(toRun: () => V) {
+    this.calculationAllowed = true;
 
-      triggerJobStore: {},
+    return (
+      [toRun(), (this.calculationAllowed = false), (this.triggerJobRoutine = null)] as const
+    )[0];
+  }
 
-      ...createJobPool(),
-    }
-  );
+  private readStateFromImage = <V>(selector: Selector<State, V>) =>
+    this.runWithRestrictionLifted(() => selector(this.state));
 
-  return { writeState, registerSelectorTrigger };
-};
+  writeState<K extends keyof State>(toWrite: Pick<State, K>) {
+    this.runWithRestrictionLifted(() => {
+      Object.assign(this.state, toWrite);
+    });
 
-type RegisterTriggerJob = (triggerJobSet: Set<() => void>) => void;
+    this.runPool();
+  }
+
+  registerSelectorTrigger(selectorTrigger: SelectorTrigger) {
+    this.triggerJobRoutine = new TriggerJob(selectorTrigger);
+
+    return this.readStateFromImage;
+  }
+}
 
 /**
- * The method `registerTriggerJob` is creating to populate the `triggerJobRoutine` from the state
- * image to register a selector trigger.
+ * The class `TriggerJob` is for populating the `triggerJobRoutine` from the state image to register
+ * a selector trigger.
  */
-export const createRegisterTriggerJob = (selectorTrigger: SelectorTrigger) =>
-  compose<
-    {},
-    {
-      /**
-       * The method receives a set of jobs to run when the corresponding state record was triggered.
-       * The method add a trigger job to the set and add the unregister job to the unregister pool.
-       */
-      registerTriggerJob: RegisterTriggerJob;
+export class TriggerJob {
+  constructor(selectorTrigger: SelectorTrigger) {
+    const triggerJob = () => {
+      selectorTrigger() || this.runUnregister();
+    };
 
+    this.registerTriggerJob = (triggerJobSet: Set<() => void>) => {
       /**
        * The job to add to the set of jobs for a certain record of the state.
        */
-      triggerJob: () => void;
+      triggerJobSet.add(triggerJob);
 
-      /**
-       * The method running all unregister jobs from the unregister pool.
-       */
-      runUnregister: () => void;
-    },
-    { unregisterPool: Set<() => void> }
-  >(
-    {},
+      this.unregisterPool.add(() => {
+        triggerJobSet.delete(triggerJob);
+      });
+    };
+  }
 
-    {
-      registerTriggerJob: ({ triggerJob, unregisterPool }, triggerJobSet) => {
-        triggerJobSet.add(triggerJob);
+  private readonly unregisterPool = new Set<() => void>();
 
-        unregisterPool.add(() => {
-          triggerJobSet.delete(triggerJob);
-        });
-      },
+  /**
+   * The method receives a set of jobs that gets run when the corresponding state record was
+   * triggered. It adds a trigger job to that set and the unregister job to the unregister pool.
+   */
+  registerTriggerJob: (triggerJobSet: Set<() => void>) => void;
 
-      triggerJob: ({ runUnregister }) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        selectorTrigger() || runUnregister();
-      },
-
-      runUnregister: ({ unregisterPool }) => {
-        unregisterPool.forEach((unregJob) => {
-          unregJob();
-        });
-      },
-    },
-
-    { unregisterPool: new Set() }
-  ).registerTriggerJob;
-
-type JobPoolMethods = {
-  addToPool: (jobs: Set<() => void>) => void;
-  runPool: () => void;
-};
-
-/**
- * Manage the pool of jobs related to selector triggers. It is populated by the `set` method of the
- * Proxy wrapping the state object to be ready to run.
- */
-export const createJobPool = () => {
-  const { addToPool, runPool } = compose<
-    {},
-    JobPoolMethods,
-    { pool: Set<Set<() => void>>; haveAlreadyBeenRun: Set<() => void> }
-  >(
-    {},
-
-    {
-      addToPool: ({ pool }, jobs) => {
-        pool.add(jobs);
-      },
-
-      runPool: ({ pool, haveAlreadyBeenRun }) => {
-        pool.forEach((chunk) => {
-          chunk.forEach((job) => {
-            if (haveAlreadyBeenRun.has(job)) return;
-
-            job();
-            haveAlreadyBeenRun.add(job);
-          });
-        });
-
-        pool.clear();
-        haveAlreadyBeenRun.clear();
-      },
-    },
-
-    {
-      pool: new Set(),
-      haveAlreadyBeenRun: new Set(),
-    }
-  );
-
-  return { addToPool, runPool };
-};
+  /**
+   * The method running all unregister jobs from the unregister pool.
+   */
+  private runUnregister() {
+    this.unregisterPool.forEach((unregJob) => {
+      unregJob();
+    });
+  }
+}
