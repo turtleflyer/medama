@@ -96,8 +96,8 @@ export const createRegisterTriggerJob = (selectorTrigger) => {
     selectorTrigger() || runUnregister();
   };
   /**
-   * The method receives a set of jobs to run when the corresponding state record was triggered.
-   * The method add a trigger job to the set and add the unregister job to the unregister pool.
+   * The method receives a set of jobs that gets run when the corresponding state record was
+   * triggered. It adds a trigger job to that set and the unregister job to the unregister pool.
    */
   const registerTriggerJob = (triggerJobSet) => {
     triggerJobSet.add(triggerJob);

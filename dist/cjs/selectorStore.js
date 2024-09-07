@@ -8,19 +8,6 @@ exports.createSelectorRecord = exports.createSelectorStore = void 0;
  */
 const createSelectorStore = (registerSelectorTrigger) => {
   const selectorSubscriptionStore = new WeakMap();
-  const getSelectorValue = (selector) => {
-    const getSelectorRecord = (selector) => {
-      var _a;
-      const selectorRecord =
-        (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0
-          ? _a
-          : (0, exports.createSelectorRecord)(selector, registerSelectorTrigger);
-      selectorSubscriptionStore.set(selector, selectorRecord);
-      return selectorRecord;
-    };
-    const { getValue } = getSelectorRecord(selector);
-    return getValue();
-  };
   const getSelectorRecord = (selector) => {
     var _a;
     const selectorRecord =
@@ -29,6 +16,10 @@ const createSelectorStore = (registerSelectorTrigger) => {
         : (0, exports.createSelectorRecord)(selector, registerSelectorTrigger);
     selectorSubscriptionStore.set(selector, selectorRecord);
     return selectorRecord;
+  };
+  const getSelectorValue = (selector) => {
+    const { getValue } = getSelectorRecord(selector);
+    return getValue();
   };
   const subscribeToStateInSelectorStore = (selector, subscription) => {
     const { addSubscription, getValue } = getSelectorRecord(selector);
