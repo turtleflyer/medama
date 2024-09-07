@@ -1,6 +1,6 @@
 {
   "name": "medama",
-  "version": "0.0.1-dev.2",
+  "version": "0.0.1",
   "private": false,
   "description": "",
   "main": "./dist/cjs/index.js",
@@ -24,7 +24,10 @@
     "clean": "rimraf ./dist",
     "build:esm": "tsc --build tsconfig.esm.json",
     "build:cjs": "tsc --build tsconfig.cjs.json",
-    "build": "npm run eslint:all && npm run clean && npm run build:cjs && npm run build:esm && prettier ./dist --write"
+    "build": "npm run clean && npm run build:cjs && npm run build:esm && prettier ./dist --write",
+    "preversion": "npm run eslint:all && npm test",
+    "version": "npm run build && git add -A",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [],
   "author": "Andy Kovalev",

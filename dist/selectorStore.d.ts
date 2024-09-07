@@ -8,10 +8,7 @@ import type { RegisterSelectorTrigger } from './state';
 export declare const createSelectorStore: <State extends object>(
   registerSelectorTrigger: RegisterSelectorTrigger<State>
 ) => {
-  getSelectorValue: {
-    <V>(selector: Selector<State, V>): V;
-    (selector: Selector<State, unknown>): unknown;
-  };
+  getSelectorValue: <V>(selector: Selector<State, V>) => V;
   subscribeToStateInSelectorStore: <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
