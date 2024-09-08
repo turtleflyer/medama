@@ -1,8 +1,8 @@
 {
   "name": "medama",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": false,
-  "description": "",
+  "description": "A minimalist, powerful, and dependency-free reactive state management library for TypeScript and JavaScript applications.",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/index.d.ts",
@@ -29,8 +29,22 @@
     "version": "npm run build && git add -A",
     "postversion": "git push && git push --tags"
   },
-  "keywords": [],
+  "keywords": [
+    "state-management",
+    "reactive",
+    "typescript",
+    "javascript",
+    "dependency-free",
+    "lightweight",
+    "performant",
+    "selectors",
+    "subscriptions",
+    "memoization",
+    "garbage-collectible",
+    "universal"
+  ],
   "author": "Andy Kovalev",
+  "homepage": "https://github.com/turtleflyer/medama#readme",
   "license": "MIT",
   "devDependencies": {
     "@eslint/eslintrc": "^3.1.0",
