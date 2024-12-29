@@ -152,7 +152,7 @@ export const createRegisterTriggerJob = (selectorTrigger: SelectorTrigger) => {
  */
 export const createJobPool = () => {
   const pool = new Set<Set<() => void>>();
-  const haveAlreadyBeenRun = new Set<() => void>();
+  let haveAlreadyBeenRun = new WeakSet<() => void>();
 
   const addToPool = (jobs: Set<() => void>) => {
     pool.add(jobs);
@@ -169,7 +169,7 @@ export const createJobPool = () => {
     });
 
     pool.clear();
-    haveAlreadyBeenRun.clear();
+    haveAlreadyBeenRun = new WeakSet();
   };
 
   return { addToPool, runPool };
