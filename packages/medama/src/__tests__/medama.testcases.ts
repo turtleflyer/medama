@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-empty-function */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { CreateMedama } from '../medama.types';
+import type { CreateMedama } from '..';
 
 export const medamaTest = (createMedama: CreateMedama) => {
   const symbKey = Symbol('symbKey');
@@ -30,7 +30,7 @@ export const medamaTest = (createMedama: CreateMedama) => {
         return pupilMethods;
       }) as CreateMedama,
     ],
-  ])('medama pupil (%s)', (_name, createMedama) => {
+  ])('medama pupil tests (%s)', (_name, createMedama) => {
     test('`readState` with simple selectors works correctly', () => {
       const { readState } = createMedama({ a: 10, 1: 20, [symbKey]: 30 });
 

@@ -11,7 +11,7 @@ export type RegisterSelectorTrigger<State extends object> = (selectorTrigger: Se
  * preventing unauthorized use.
  */
 export declare const createStateImage: <State extends object>(initState?: Partial<State>) => {
-    writeState: <K extends keyof State>(toWrite: Pick<State, K>) => void;
+    writeState: (toWrite: Partial<State>) => void;
     registerSelectorTrigger: (selectorTrigger: SelectorTrigger) => ReadState<State>;
 };
 /**

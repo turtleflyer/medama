@@ -52,7 +52,7 @@ export const createStateImage = <State extends object>(initState?: Partial<State
   const readStateFromImage: ReadState<State> = (selector) =>
     runWithRestrictionLifted(() => selector(state));
 
-  const writeState = <K extends keyof State>(toWrite: Pick<State, K>) => {
+  const writeState = (toWrite: Partial<State>) => {
     runWithRestrictionLifted(() => {
       Object.assign(state, toWrite);
     });

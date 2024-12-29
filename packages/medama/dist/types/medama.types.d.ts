@@ -10,17 +10,17 @@ export type SubscriptionMethods<V> = {
 };
 export type SubscribeToState<State extends object> = <V>(selector: Selector<State, V>, subscription: Subscription<V>) => SubscriptionMethods<V>;
 export type ReadState<State extends object> = <V>(selector: Selector<State, V>) => V;
-export type Setter<State extends object, K extends keyof State> = (state: State) => Pick<State, K>;
-export type SetState<State extends object> = <K extends keyof State>(stateChange: Setter<State, K> | Pick<State, K>) => Pick<State, K>;
+export type Setter<State extends object, SChange extends Partial<State>> = (state: State) => SChange;
+export type SetState<State extends object> = <SChange extends Partial<State>>(stateChange: SChange | Setter<State, SChange>) => SChange;
 export type ResetState<State extends object> = (initState?: Partial<State>) => void;
-export type MedamaMethods<State extends object> = {
+export type Pupil<State extends object> = {
     subscribeToState: SubscribeToState<State>;
     readState: ReadState<State>;
     setState: SetState<State>;
     resetState: ResetState<State>;
 };
-export type Medama<State extends object> = MedamaMethods<State> & {
-    pupil: MedamaMethods<State>;
+export type Medama<State extends object> = Pupil<State> & {
+    pupil: Pupil<State>;
 };
 export type CreateMedama = {
     <State extends object>(initState: State): Normalize<Medama<State>>;
