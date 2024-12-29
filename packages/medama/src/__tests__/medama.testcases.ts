@@ -30,6 +30,78 @@ export const medamaTest = (createMedama: CreateMedama) => {
         return pupilMethods;
       }) as CreateMedama,
     ],
+
+    [
+      'using `createMedama` after throwing error while reading the state',
+      ((...args: [any]) => {
+        const { readState } = createMedama();
+
+        expect(() =>
+          readState(() => {
+            throw new Error();
+          })
+        ).toThrow();
+
+        return createMedama(...args);
+      }) as CreateMedama,
+    ],
+
+    [
+      'using `createMedama` after throwing error in selector while subscribing to the state',
+      ((...args: [any]) => {
+        const { subscribeToState } = createMedama();
+
+        expect(() =>
+          subscribeToState(
+            () => {
+              throw new Error();
+            },
+
+            () => {}
+          )
+        ).toThrow();
+
+        return createMedama(...args);
+      }) as CreateMedama,
+    ],
+
+    [
+      'using `createMedama` after throwing error in init part of subscription',
+      ((...args: [any]) => {
+        const { subscribeToState } = createMedama();
+
+        expect(() =>
+          subscribeToState(
+            () => {},
+
+            () => {
+              throw new Error();
+            }
+          )
+        ).toThrow();
+
+        return createMedama(...args);
+      }) as CreateMedama,
+    ],
+
+    [
+      'using `createMedama` after throwing error in subscription job',
+      ((...args: [any]) => {
+        const { subscribeToState, setState } = createMedama<{ a: any }>();
+
+        subscribeToState(
+          (state) => state.a,
+
+          () => () => {
+            throw new Error();
+          }
+        );
+
+        expect(() => setState({ a: {} })).toThrow();
+
+        return createMedama(...args);
+      }) as CreateMedama,
+    ],
   ])('medama pupil tests (%s)', (_name, createMedama) => {
     test('`readState` with simple selectors works correctly', () => {
       const { readState } = createMedama({ a: 10, 1: 20, [symbKey]: 30 });
@@ -1306,6 +1378,32 @@ export const medamaTest = (createMedama: CreateMedama) => {
       setState({ b: 'go' });
       expect(testValue).toEqual({ newA: 1, newB: 'go' });
       expect(selector).toHaveBeenCalledTimes(1);
+    });
+
+    test('dangerous state updates prohibited during subscription or inside subscription job', () => {
+      const { setState, subscribeToState } = createMedama({ a: 1, b: 10 });
+
+      expect(() =>
+        subscribeToState(
+          ({ a }) => a,
+
+          () => {
+            setState({ a: 2 });
+          }
+        )
+      ).toThrow('Medama Error: The state update occurs during a subscription');
+
+      subscribeToState(
+        ({ b }) => b,
+
+        () => () => {
+          setState({ b: 20 });
+        }
+      );
+
+      expect(() => setState({ b: 30 })).toThrow(
+        'Medama Error: A subscription job launches the state update'
+      );
     });
   });
 };

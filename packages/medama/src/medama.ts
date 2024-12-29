@@ -16,28 +16,70 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
 
   let selectorStore = createSelectorStore(state.registerSelectorTrigger);
 
+  let flagSubscriptionInProgress = false;
+  let flagStateUpdating = false;
+
+  const resetInit = () => {
+    flagSubscriptionInProgress = false;
+    flagStateUpdating = false;
+  };
+
   const subscribeToState: SubscribeToState<State> = <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
   ) => {
-    const toReturn = createResubscribeStore<V>((sub) =>
-      selectorStore.subscribeToStateInSelectorStore(selector, sub)
-    );
+    try {
+      flagSubscriptionInProgress = true;
 
-    toReturn.resubscribe(subscription);
+      const toReturn = createResubscribeStore<V>((sub) =>
+        selectorStore.subscribeToStateInSelectorStore(selector, sub)
+      );
 
-    return toReturn;
+      toReturn.resubscribe(subscription);
+      flagSubscriptionInProgress = false;
+
+      return toReturn;
+    } catch (e) {
+      resetInit();
+
+      throw e;
+    }
   };
 
-  const readState: ReadState<State> = (selector) => selectorStore.getSelectorValue(selector);
+  const readState: ReadState<State> = (selector) => {
+    try {
+      return selectorStore.getSelectorValue(selector);
+    } catch (e) {
+      resetInit();
+
+      throw e;
+    }
+  };
 
   const setState: SetState<State> = (stateChange) => {
-    const mergeToState =
-      typeof stateChange === 'function' ? selectorStore.getSelectorValue(stateChange) : stateChange;
+    try {
+      if (flagSubscriptionInProgress)
+        throw new Error('Medama Error: The state update occurs during a subscription');
 
-    state.writeState(mergeToState);
+      if (flagStateUpdating)
+        throw new Error('Medama Error: A subscription job launches the state update');
 
-    return mergeToState;
+      flagStateUpdating = true;
+
+      const mergeToState =
+        typeof stateChange === 'function'
+          ? selectorStore.getSelectorValue(stateChange)
+          : stateChange;
+
+      state.writeState(mergeToState);
+      flagStateUpdating = false;
+
+      return mergeToState;
+    } catch (e) {
+      resetInit();
+
+      throw e;
+    }
   };
 
   const resetState: ResetState<State> = (initState) => {
