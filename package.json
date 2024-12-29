@@ -1,5 +1,4 @@
 {
-  "name": "@medama/packages",
   "private": true,
   "version": "0.0.4",
   "directories": {
@@ -13,7 +12,7 @@
   "description": "",
   "workspaces": [
     "packages/medama",
-    "packages/@medama/medama"
+    "packages/@medamajs/medama"
   ],
   "devDependencies": {
     "@eslint/eslintrc": "^3.1.0",

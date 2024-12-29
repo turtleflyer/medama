@@ -1,5 +1,5 @@
 {
-  "name": "@medama/medama",
+  "name": "@medamajs/medama",
   "version": "0.0.4",
   "private": false,
   "description": "A minimalist, powerful, and dependency-free reactive state management library for TypeScript and JavaScript applications.",
