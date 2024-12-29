@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.esm.json",
+  "compilerOptions": {
+    "outDir": "dist/esm",
+    "declarationDir": "dist/types",
+    "rootDirs": [
+      "./src",
+      "../shared"
+    ]
+  },
+  "references": [
+    {
+      "path": "./tsconfig.shared.esm.json"
+    }
+  ],
+  "include": [
+    "src"
+  ]
+}

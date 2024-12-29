@@ -2,9 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "outDir": "./dist/cjs"
+    "moduleResolution": "Node10"
   },
   "exclude": [
-    "./src/*.test.*"
+    "**/__tests__/**/*.*"
   ]
 }

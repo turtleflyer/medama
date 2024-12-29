@@ -1,51 +1,20 @@
 {
-  "name": "medama",
+  "name": "@medama/packages",
+  "private": true,
   "version": "0.0.4",
-  "private": false,
-  "description": "A minimalist, powerful, and dependency-free reactive state management library for TypeScript and JavaScript applications.",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js",
-  "types": "./dist/index.d.ts",
   "directories": {
-    "src": "./src",
-    "dist": "./dist"
-  },
-  "exports": {
-    ".": {
-      "require": "./dist/cjs/index.js",
-      "import": "./dist/esm/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./package.json": "./package.json"
+    "doc": "doc"
   },
   "scripts": {
-    "test": "jest",
-    "eslint:all": "eslint .",
-    "clean": "rimraf ./dist",
-    "build:esm": "tsc --build tsconfig.esm.json",
-    "build:cjs": "tsc --build tsconfig.cjs.json",
-    "build": "npm run clean && npm run build:cjs && npm run build:esm && prettier ./dist --write",
-    "preversion": "npm run eslint:all && npm test",
-    "version": "npm run build && git add -A",
-    "postversion": "git push && git push --tags"
+    "test": "jest"
   },
-  "keywords": [
-    "state-management",
-    "reactive",
-    "typescript",
-    "javascript",
-    "dependency-free",
-    "lightweight",
-    "performant",
-    "selectors",
-    "subscriptions",
-    "memoization",
-    "garbage-collectible",
-    "universal"
-  ],
   "author": "Andy Kovalev",
-  "homepage": "https://github.com/turtleflyer/medama#readme",
   "license": "MIT",
+  "description": "",
+  "workspaces": [
+    "packages/medama",
+    "packages/@medama/medama"
+  ],
   "devDependencies": {
     "@eslint/eslintrc": "^3.1.0",
     "@eslint/js": "^9.9.1",

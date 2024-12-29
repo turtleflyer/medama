@@ -5,15 +5,19 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Jest Tests",
+      "name": "Debug Jest Tests (medama)",
       "type": "node",
       "request": "launch",
+      "runtimeExecutable": "npm",
       "runtimeArgs": [
-        "--inspect-brk",
-        "${workspaceRoot}/node_modules/jest/bin/jest.js",
-        "--runInBand",
-        "src/medama.test.ts"
+        "test",
+        "-w",
+        "medama",
+        "--",
+        "medama.test",
+        "--coverage=false",
+        "--runInBand"
       ],
-    }
+    },
   ]
 }
