@@ -1,3 +1,3 @@
-import config from '../../../jest.config';
+import rootConfig from '../../../jest.config';
 
-export default config;
+export default rootConfig;

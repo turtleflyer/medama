@@ -1,0 +1,6 @@
+coverage
+tsconfig*
+__tests__
+jest.config.ts
+*.tsbuildinfo
+tsbuild

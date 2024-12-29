@@ -4,8 +4,9 @@
     "module": "ES6",
     "moduleResolution": "Bundler",
     "declaration": true,
+    "declarationMap": true
   },
   "exclude": [
-    "packages/**/src/*.test.*"
+    "**/__tests__/**/*.*"
   ]
 }

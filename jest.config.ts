@@ -11,6 +11,7 @@ const config: Config = {
   resetMocks: true,
   resetModules: true,
   transform: { '.*.ts': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  testMatch: ["**/__tests__/**/*.test.ts"]
 };
 
 export default config;

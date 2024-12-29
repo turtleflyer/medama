@@ -1,4 +1,4 @@
-import type { Normalize } from './helpers';
+import type { Normalize } from './type-helpers/Normalize';
 
 export type Selector<State extends object, V = unknown> = (state: State) => V;
 

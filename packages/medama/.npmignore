@@ -1,5 +1,0 @@
-/coverage
-/tsconfig*
-/*.ts
-/*.js
-/src/**/*.test.*
