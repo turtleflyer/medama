@@ -77,11 +77,10 @@ export const createStateImage = <State extends object>(initState?: Partial<State
   const proxyHandler: ProxyHandler<State> = {
     get: (target, p) => {
       restrictCalculation();
-      const registerTriggerJob = triggerJobRoutine;
 
-      if (registerTriggerJob) {
+      if (triggerJobRoutine) {
         const triggerStoreRec = (triggerJobStore[p as typeof p & keyof State] ??= new Set());
-        registerTriggerJob(triggerStoreRec);
+        triggerJobRoutine(triggerStoreRec);
       }
 
       return target[p as typeof p & keyof State];

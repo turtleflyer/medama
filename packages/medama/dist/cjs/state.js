@@ -53,10 +53,9 @@ const createStateImage = (initState) => {
             var _a;
             var _b;
             restrictCalculation();
-            const registerTriggerJob = triggerJobRoutine;
-            if (registerTriggerJob) {
+            if (triggerJobRoutine) {
                 const triggerStoreRec = ((_a = triggerJobStore[_b = p]) !== null && _a !== void 0 ? _a : (triggerJobStore[_b] = new Set()));
-                registerTriggerJob(triggerStoreRec);
+                triggerJobRoutine(triggerStoreRec);
             }
             return target[p];
         },
