@@ -5,7 +5,9 @@
     "doc": "doc"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "version": "git add -A",
+    "postversion": "git push && git push --tags"
   },
   "author": "Andy Kovalev",
   "license": "MIT",

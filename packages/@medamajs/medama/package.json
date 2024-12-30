@@ -24,10 +24,8 @@
     "clean": "rimraf ./dist",
     "build:esm": "tsc --build tsconfig.esm.json",
     "build:cjs": "tsc --build tsconfig.cjs.json",
-    "build": "npm run clean && npm run build:cjs && npm run build:esm && prettier ./dist --write",
-    "preversion": "npm run lint && npm test",
-    "version": "npm run build && git add -A",
-    "postversion": "git push && git push --tags"
+    "build": "npm run clean && npm run build:cjs && npm run build:esm",
+    "preversion": "npm run lint && npm run build && npm test"
   },
   "keywords": [
     "state-management",
@@ -47,6 +45,6 @@
   "homepage": "https://github.com/turtleflyer/medama#readme",
   "license": "MIT",
   "dependencies": {
-    "medama": "^0.0.4"
+    "medama": "0.0.4"
   }
 }
