@@ -6,16 +6,52 @@ const state_1 = require("./state");
 const createMedama = (initState) => {
     let state = (0, state_1.createStateImage)(initState);
     let selectorStore = (0, selectorStore_1.createSelectorStore)(state.registerSelectorTrigger);
-    const subscribeToState = (selector, subscription) => {
-        const toReturn = createResubscribeStore((sub) => selectorStore.subscribeToStateInSelectorStore(selector, sub));
-        toReturn.resubscribe(subscription);
-        return toReturn;
+    let flagSubscriptionInProgress = false;
+    let flagStateUpdating = false;
+    const resetInit = () => {
+        flagSubscriptionInProgress = false;
+        flagStateUpdating = false;
     };
-    const readState = (selector) => selectorStore.getSelectorValue(selector);
+    const subscribeToState = (selector, subscription) => {
+        try {
+            flagSubscriptionInProgress = true;
+            const toReturn = createResubscribeStore((sub) => selectorStore.subscribeToStateInSelectorStore(selector, sub));
+            toReturn.resubscribe(subscription);
+            flagSubscriptionInProgress = false;
+            return toReturn;
+        }
+        catch (e) {
+            resetInit();
+            throw e;
+        }
+    };
+    const readState = (selector) => {
+        try {
+            return selectorStore.getSelectorValue(selector);
+        }
+        catch (e) {
+            resetInit();
+            throw e;
+        }
+    };
     const setState = (stateChange) => {
-        const mergeToState = typeof stateChange === 'function' ? selectorStore.getSelectorValue(stateChange) : stateChange;
-        state.writeState(mergeToState);
-        return mergeToState;
+        try {
+            if (flagSubscriptionInProgress)
+                throw new Error('Medama Error: The state update occurs during a subscription');
+            if (flagStateUpdating)
+                throw new Error('Medama Error: A subscription job launches the state update');
+            flagStateUpdating = true;
+            const mergeToState = typeof stateChange === 'function'
+                ? selectorStore.getSelectorValue(stateChange)
+                : stateChange;
+            state.writeState(mergeToState);
+            flagStateUpdating = false;
+            return mergeToState;
+        }
+        catch (e) {
+            resetInit();
+            throw e;
+        }
     };
     const resetState = (initState) => {
         const newState = (0, state_1.createStateImage)(initState);
