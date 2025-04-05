@@ -1,0 +1,12 @@
+{
+  "extends": "../../../tsconfig.esm.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "../../shared",
+    "outDir": "./dist/esm",
+    "declarationDir": "dist/types",
+  },
+  "files": [
+    "../../shared/type-helpers/Normalize.ts",
+  ]
+}

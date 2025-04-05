@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "medama": [
+        "../../medama/src/index.ts"
+      ]
+    },
+    "rootDirs": [
+      "./src",
+      "../../shared",
+      "../../medama/src"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.cjs.json",
+  "compilerOptions": {
+    "outDir": "dist/cjs",
+    "rootDirs": [
+      "./src",
+      "../../shared"
+    ]
+  },
+  "references": [
+    {
+      "path": "./tsconfig.shared.cjs.json"
+    }
+  ],
+  "include": [
+    "src"
+  ]
+}

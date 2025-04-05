@@ -19,5 +19,21 @@
         "--runInBand"
       ],
     },
+    {
+      "name": "Debug Jest Tests (@medamajs/composition)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "test",
+        "-w",
+        "@medamajs/composition",
+        "--",
+        "--",
+        "debug",
+        "--coverage=false",
+        "--runInBand"
+      ],
+    }
   ]
 }
