@@ -1,0 +1,3 @@
+export const _COMPOSITE_STATE_SIGNATURE = Symbol('COMPOSITE_STATE_SIGNATURE');
+export const _RELAY_SUBSCRIPTION_MEANS = Symbol('RELAY_SUBSCRIPTION_MEANS');
+//# sourceMappingURL=const.js.map
