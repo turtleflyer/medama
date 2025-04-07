@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { createMedama, type Pupil } from '..';
-import type { IsEqual, IsTrue } from '../test-tools/IsEqual';
+import type { IsEqual, IsTrue } from '../IsEqual';
 
 const symbKey = Symbol('symbKey');
 

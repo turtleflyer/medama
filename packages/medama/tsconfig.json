@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDirs": [
       "./src",
-      "../shared"
+      "../../test-tools"
     ]
   }
 }

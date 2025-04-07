@@ -4,15 +4,9 @@
     "outDir": "dist/esm",
     "declarationDir": "dist/types",
     "rootDirs": [
-      "./src",
-      "../shared"
+      "./src"
     ]
   },
-  "references": [
-    {
-      "path": "./tsconfig.shared.esm.json"
-    }
-  ],
   "include": [
     "src"
   ]
