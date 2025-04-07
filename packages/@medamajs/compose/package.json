@@ -1,6 +1,6 @@
 {
   "name": "@medamajs/compose",
-  "version": "0.0.7-dev.0",
+  "version": "0.0.7-dev.1",
   "private": false,
   "description": "",
   "main": "./dist/cjs/index.js",
