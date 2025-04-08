@@ -3,15 +3,9 @@
   "compilerOptions": {
     "outDir": "dist/cjs",
     "rootDirs": [
-      "./src",
-      "../shared"
+      "./src"
     ]
   },
-  "references": [
-    {
-      "path": "./tsconfig.shared.cjs.json"
-    }
-  ],
   "include": [
     "src"
   ]

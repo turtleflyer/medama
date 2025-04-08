@@ -3,7 +3,7 @@
 import { createMedama } from 'medama';
 import { composeMedama, type CompositePupil, type DeleteLayers } from '..';
 import type { CompositeState } from '../auxiliaryTypes';
-import type { IsEqual, IsTrue } from '../test-tools/IsEqual';
+import type { IsEqual, IsTrue } from '../IsEqual';
 
 const symbKey = Symbol('symbKey');
 

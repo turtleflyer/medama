@@ -135,7 +135,31 @@ truly clean slate.
 The `createMedama` function yields a `pupil` object, which encapsulates all available methods.
 
 ```ts
+const { pupil } = createMedama();
 const { readState, subscribeToState, setState, resetState } = pupil;
+```
+
+The return of `createMedama` itself can be considered as the pupil object - the separate `pupil`
+member in the returned object is provided for convenience when you need both the pupil object and
+specific methods simultaneously. Here's a practical example using a derivative library:
+
+```ts
+// Using @medamajs/compose - a standalone derivative library that enables composition
+// of multiple medama states into a cohesive unit
+const { subscribeToState, setState, pupil } = createMedama();
+
+subscribeToState(
+  (state) =>
+  //...
+ )
+
+// Using @medamajs/compose - a standalone derivative library that enables composition
+// of multiple medama states into a cohesive unit
+const composed = composeMedama({
+  layer1: pupil,
+  layer2: createMedama(),
+  //...
+});
 ```
 
 The name "Medama" draws inspiration from the Japanese word 目玉, meaning "eyeball," with the pupil
