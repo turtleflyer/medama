@@ -45,7 +45,7 @@
     "universal"
   ],
   "author": "Andy Kovalev",
-  "homepage": "https://github.com/turtleflyer/medama#readme",
+  "homepage": "https://github.com/turtleflyer/medama/tree/master/packages/medama#readme",
   "license": "MIT",
   "dependencies": {
     "medama": "0.0.6"
