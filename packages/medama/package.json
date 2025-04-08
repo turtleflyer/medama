@@ -1,6 +1,6 @@
 {
   "name": "medama",
-  "version": "0.0.7-dev.1",
+  "version": "0.0.7",
   "private": false,
   "description": "A minimalist, powerful, and dependency-free reactive state management library for TypeScript and JavaScript applications.",
   "main": "./dist/cjs/index.js",
