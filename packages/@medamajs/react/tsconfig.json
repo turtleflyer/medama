@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "es2015"
+    ],
+    "jsx": "react-jsx",
+    "paths": {
+      "medama": [
+        "../../medama/src/index.ts"
+      ]
+    },
+    "rootDirs": [
+      "./src",
+      "../../medama/src"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.cjs.json",
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "es2015"
+    ],
+    "jsx": "react-jsx",
+    "outDir": "dist/cjs",
+    "rootDirs": [
+      "./src"
+    ]
+  },
+  "include": [
+    "src"
+  ]
+}

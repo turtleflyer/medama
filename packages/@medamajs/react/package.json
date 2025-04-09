@@ -1,0 +1,62 @@
+{
+  "name": "@medamajs/react",
+  "version": "0.0.7",
+  "private": false,
+  "description": "React bindings and integration package for medama state management library",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "directories": {
+    "src": "./src",
+    "dist": "./dist"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/esm/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint",
+    "clean": "rimraf ./dist",
+    "build:esm": "tsc --build tsconfig.esm.json",
+    "build:cjs": "tsc --build tsconfig.cjs.json",
+    "build": "npm run clean && npm run build:cjs && npm run build:esm",
+    "preversion": "npm run lint && npm run build"
+  },
+  "keywords": [
+    "react",
+    "medama",
+    "state-management",
+    "react-hooks",
+    "react-components",
+    "reactive",
+    "state",
+    "store",
+    "typescript",
+    "javascript",
+    "hooks",
+    "context",
+    "selectors",
+    "subscriptions",
+    "memoization",
+    "performance",
+    "lightweight",
+    "dependency-free"
+  ],
+  "author": "Andy Kovalev",
+  "homepage": "https://github.com/turtleflyer/medama/tree/master/packages/%40medamajs/react#readme",
+  "license": "MIT",
+  "peerDependencies": {
+    "@types/react": "^17.0.85 || ^18.3.20 || ^19.1.1",
+    "react": "^17.0.2 || ^18.3.1 || ^19.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
+  }
+}
