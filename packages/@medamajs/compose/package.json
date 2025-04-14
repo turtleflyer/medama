@@ -1,6 +1,6 @@
 {
   "name": "@medamajs/compose",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": false,
   "description": "Composable state management extension for medama with support for hierarchical state layers, dynamic composition, and parallel state synchronization",
   "main": "./dist/cjs/index.js",
@@ -53,6 +53,6 @@
   "homepage": "https://github.com/turtleflyer/medama/tree/master/packages/%40medamajs/compose#readme",
   "license": "MIT",
   "dependencies": {
-    "medama": "^0.0.6"
+    "medama": "^0.0.8"
   }
 }
