@@ -18,9 +18,9 @@ Wrap your app or component tree with `ProvideMedama` to make medama state availa
 ```tsx
 import { ProvideMedama } from '@medamajs/react';
 import { createMedama } from 'medama';
-import { initialState, type AppState } from './state';
+import { initialState } from './state';
 
-const pupil = createMedama<AppState>(initialState);
+const pupil = createMedama(initialState);
 
 function App() {
   return (
@@ -42,7 +42,8 @@ import { useMedamaSelector } from '@medamajs/react';
 import type { AppState } from './state';
 
 function Counter() {
-  const count = useMedamaSelector<AppState>((state) => state.count);
+  const count = useMedamaSelector((state: AppState) => state.count);
+
   return <div>{count}</div>;
 }
 ```
@@ -97,11 +98,8 @@ You can nest providers and identify them with IDs:
 Access specific provider in hooks:
 
 ```tsx
-import type { GlobalState } from './state';
-import type { FeatureState } from './feature';
-
-const globalValue = useMedamaSelector<GlobalState>(selector, { id: "global" });
-const featureValue = useMedamaSelector<FeatureState>(selector, { id: "feature" });
+const globalValue = useMedamaSelector(globalSelector, { id: "global" });
+const featureValue = useMedamaSelector(featureSelector, { id: "feature" });
 ```
 
 ## API
@@ -111,7 +109,7 @@ const featureValue = useMedamaSelector<FeatureState>(selector, { id: "feature" }
 - `ProvideMedama`: Context provider component
   - `pupil`: Medama pupil instance
   - `id?`: Optional identifier for nested providers
-  - `children`: React nodes
+  - `children?`: React nodes
 
 ### Hooks
 
