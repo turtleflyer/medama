@@ -1,13 +1,17 @@
-import type { Selector, Subscription, SubscriptionJob } from './medama.types';
-import type { RegisterSelectorTrigger } from './state';
-export declare const createSelectorStore: <State extends object>(registerSelectorTrigger: RegisterSelectorTrigger<State>) => {
-    getSelectorValue: <V>(selector: Selector<State, V>) => V;
-    subscribeToStateInSelectorStore: <V>(selector: Selector<State, V>, subscription: Subscription<V>) => () => void;
+import type { Selector, Subscription, SubscriptionJob, SubscriptionMethods } from './medama.types';
+import type { RunOverState } from './state';
+type GetSelectorValue<State extends object> = <V>(selector: Selector<State, V>) => V;
+type SubscribeToStateInSelectorStore<State extends object> = <V>(selector: Selector<State, V>, subscription: Subscription<V>) => SubscriptionMethods<V>;
+export declare const createSelectorStore: <State extends object>(runOverState: RunOverState<State, unknown>) => {
+    getSelectorValue: GetSelectorValue<State>;
+    subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State>;
 };
 type AddSubscription<V> = (subscriptionJob: SubscriptionJob<V>) => () => void;
-export declare const createSelectorRecord: <State extends object, V>(selector: Selector<State, V>, registerSelectorTrigger: RegisterSelectorTrigger<State>) => {
+type GetValue<V> = () => V;
+type SelectorRecord<V> = {
     addSubscription: AddSubscription<V>;
-    getValue: () => V;
+    getValue: GetValue<V>;
 };
+export declare const createSelectorRecord: <State extends object, V>(selector: Selector<State, V>, runOverState: RunOverState<State, V>) => SelectorRecord<V>;
 export {};
 //# sourceMappingURL=selectorStore.d.ts.map

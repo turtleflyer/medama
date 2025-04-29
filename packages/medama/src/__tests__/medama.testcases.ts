@@ -1405,5 +1405,56 @@ export const medamaTest = (createMedama: CreateMedama) => {
         'Medama Error: A subscription job launches the state update'
       );
     });
+
+    test('selector remember its dependent state keys', () => {
+      type State = { a: number; b: number };
+      const { setState, subscribeToState } = createMedama<State>({ a: 1, b: 10 });
+
+      let selectorFirstRun = true;
+
+      const selector = jest.fn((state: State) => {
+        return [selectorFirstRun ? { ...state } : state.a, (selectorFirstRun = false)];
+      });
+
+      const { unsubscribe } = subscribeToState(selector, () => {});
+
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: 2 });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ b: 20 });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      unsubscribe();
+      setState({ a: 3 });
+      expect(selector).toHaveBeenCalledTimes(0);
+
+      selector.mock.calls = [];
+
+      setState({ b: 30 });
+      expect(selector).toHaveBeenCalledTimes(0);
+
+      selector.mock.calls = [];
+
+      subscribeToState(selector, () => {});
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: 4 });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ b: 40 });
+      expect(selector).toHaveBeenCalledTimes(1);
+    });
   });
 };

@@ -2,24 +2,41 @@ import type {
   CreateMedama,
   ReadState,
   ResetState,
-  Resubscribe,
   Selector,
   SetState,
   SubscribeToState,
   Subscription,
+  SubscriptionMethods,
 } from './medama.types';
 import { createSelectorStore } from './selectorStore';
 import { createStateImage } from './state';
 
 export const createMedama: CreateMedama = <State extends object>(initState?: Partial<State>) => {
   let state = createStateImage(initState);
+  let selectorStore = createSelectorStore(state.runOverState);
 
-  let selectorStore = createSelectorStore(state.registerSelectorTrigger);
-
+  /**
+   * Flag to prevent state updates during subscription setup. True while
+   * subscription is being configured. Used to throw error if state update is
+   * attempted during subscription.
+   */
   let flagSubscriptionInProgress = false;
+
+  /**
+   * Flag to prevent recursive state updates from subscription jobs. True while
+   * state update is in progress. Used to throw error if subscription job
+   * attempts state update.
+   */
   let flagStateUpdating = false;
 
-  const resetInit = () => {
+  /**
+   * Resets state management flags to their initial values. Called during error
+   * handling to ensure clean state after:
+   * - Failed subscription setup
+   * - Failed state updates
+   * - Failed state reads
+   */
+  const resetInit = (): void => {
     flagSubscriptionInProgress = false;
     flagStateUpdating = false;
   };
@@ -27,18 +44,16 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
   const subscribeToState: SubscribeToState<State> = <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
-  ) => {
+  ): SubscriptionMethods<V> => {
     try {
       flagSubscriptionInProgress = true;
 
-      const toReturn = createResubscribeStore<V>((sub) =>
-        selectorStore.subscribeToStateInSelectorStore(selector, sub)
-      );
-
-      toReturn.resubscribe(subscription);
-      flagSubscriptionInProgress = false;
-
-      return toReturn;
+      return (
+        [
+          selectorStore.subscribeToStateInSelectorStore(selector, subscription),
+          (flagSubscriptionInProgress = false),
+        ] as const
+      )[0];
     } catch (e) {
       resetInit();
 
@@ -66,15 +81,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
 
       flagStateUpdating = true;
 
-      const mergeToState =
-        typeof stateChange === 'function'
-          ? selectorStore.getSelectorValue(stateChange)
-          : stateChange;
-
-      state.writeState(mergeToState);
-      flagStateUpdating = false;
-
-      return mergeToState;
+      return ([state.setState(stateChange), (flagStateUpdating = false)] as const)[0];
     } catch (e) {
       resetInit();
 
@@ -84,28 +91,13 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
 
   const resetState: ResetState<State> = (initState) => {
     const newState = createStateImage(initState);
-    const newSelectorStore = createSelectorStore(newState.registerSelectorTrigger);
+    const newSelectorStore = createSelectorStore(newState.runOverState);
     state = newState;
     selectorStore = newSelectorStore;
+    resetInit();
   };
 
   const pupil = { subscribeToState, resetState, setState, readState };
 
   return { ...pupil, pupil };
-};
-
-const createResubscribeStore = <V>(subscribe: (subscription: Subscription<V>) => () => void) => {
-  let unsubscribeFromRecentSubscription: (() => void) | null = null;
-
-  const unsubscribe = () => {
-    unsubscribeFromRecentSubscription?.();
-    unsubscribeFromRecentSubscription = null;
-  };
-
-  const resubscribe: Resubscribe<V> = (subscription) => {
-    unsubscribeFromRecentSubscription?.();
-    unsubscribeFromRecentSubscription = subscribe(subscription);
-  };
-
-  return { unsubscribe, resubscribe };
 };
