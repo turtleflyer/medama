@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>242/242</span>
+                <span class='fraction'>248/248</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>24/24</span>
+                <span class='fraction'>23/23</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>17/17</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>242/242</span>
+                <span class='fraction'>248/248</span>
             </div>
         
             
@@ -305,7 +305,16 @@
 <a name='L240'></a><a href='#L240'>240</a>
 <a name='L241'></a><a href='#L241'>241</a>
 <a name='L242'></a><a href='#L242'>242</a>
-<a name='L243'></a><a href='#L243'>243</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -370,11 +379,9 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">4402x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">4110x</span>
-<span class="cline-any cline-yes">4110x</span>
+<span class="cline-any cline-yes">4402x</span>
+<span class="cline-any cline-yes">4402x</span>
+<span class="cline-any cline-yes">4402x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
@@ -396,7 +403,12 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -549,6 +561,15 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { createMedama } from 'medama';
 &nbsp;
+/**
+ * Function to execute job with read mode enabled. Sets read work state to true
+ * before execution, resets both read work and subscription means states after
+ * completion.
+ *
+ * @param job Function to execute in read mode
+ */
+type RunWithReadModeOn = (job: () =&gt; void) =&gt; void;
+&nbsp;
 type ReadWorkModeMethods = {
   /**
    * Returns current read work state. True indicates that reading process is in
@@ -558,17 +579,11 @@ type ReadWorkModeMethods = {
   getReadWorkState: () =&gt; boolean;
 &nbsp;
   /**
-   * Sets read work state to true, indicating start of reading process. Used to
-   * mark that any subsequent nested reads should be treated as derivative
-   * calls.
+   * Function to execute job with read mode enabled. Sets read work state to
+   * true before execution, resets both read work and subscription means states
+   * after completion.
    */
-  startReading: () =&gt; void;
-&nbsp;
-  /**
-   * Sets read work state and subscription means requested state to false. Marks
-   * completion of reading process and subscription collection.
-   */
-  finishReading: () =&gt; void;
+  runWithReadModeOn: RunWithReadModeOn;
 &nbsp;
   /**
    * Sets subscription means requested state to true. Indicates that nested
@@ -610,11 +625,9 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods =&gt; {
 &nbsp;
   const getReadWorkState = (): boolean =&gt; readWorkState;
 &nbsp;
-  const startReading = (): void =&gt; {
+  const runWithReadModeOn = (job: () =&gt; void): void =&gt; {
     readWorkState = true;
-  };
-&nbsp;
-  const finishReading = (): void =&gt; {
+    job();
     readWorkState = false;
     requestSubscriptionMeansState = false;
   };
@@ -632,13 +645,16 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods =&gt; {
 &nbsp;
   return {
     getReadWorkState,
-    startReading,
-    finishReading,
+    runWithReadModeOn,
     setSubscriptionMeansRequested,
     getRequestSubscriptionMeansState,
     resetReadWorkMode,
   };
 };
+&nbsp;
+export type DeferOrRun = (job: () =&gt; void) =&gt; void;
+&nbsp;
+type Reset = () =&gt; void;
 &nbsp;
 type ConditionalDeferrerMethods = {
   /**
@@ -647,14 +663,19 @@ type ConditionalDeferrerMethods = {
    * - If in update mode: defers job and subscribes to resolution signal (if not
    *   already subscribed)
    */
-  deferOrRun: (job: () =&gt; void) =&gt; void;
+  deferOrRun: DeferOrRun;
 &nbsp;
   /**
    * Resets subscription state to false. Used during initialization and error
    * handling to ensure clean state.
    */
-  reset: () =&gt; void;
+  reset: Reset;
 };
+&nbsp;
+type CreateConditionalDeferrer = (
+  deferJob: (job: () =&gt; void) =&gt; void,
+  resolveDeferred: () =&gt; void
+) =&gt; ConditionalDeferrerMethods;
 &nbsp;
 type UpdateWorkModeMethods = {
   /**
@@ -683,10 +704,7 @@ type UpdateWorkModeMethods = {
    * @param deferJob Function to add job to deferred queue
    * @param resolveDeferred Function to process deferred queue
    */
-  createConditionalDeferrer: (
-    deferJob: (job: () =&gt; void) =&gt; void,
-    resolveDeferred: () =&gt; void
-  ) =&gt; ConditionalDeferrerMethods;
+  createConditionalDeferrer: CreateConditionalDeferrer;
 &nbsp;
   /**
    * Resets signal state and update work state to false. Used during
@@ -796,7 +814,7 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-14T02:39:40.992Z
+                at 2025-05-04T21:17:16.481Z
             </div>
         <script src="../prettify.js"></script>
         <script>

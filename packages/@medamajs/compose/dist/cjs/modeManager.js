@@ -6,10 +6,9 @@ const createReadWorkModeManager = () => {
     let readWorkState = false;
     let requestSubscriptionMeansState = false;
     const getReadWorkState = () => readWorkState;
-    const startReading = () => {
+    const runWithReadModeOn = (job) => {
         readWorkState = true;
-    };
-    const finishReading = () => {
+        job();
         readWorkState = false;
         requestSubscriptionMeansState = false;
     };
@@ -23,8 +22,7 @@ const createReadWorkModeManager = () => {
     };
     return {
         getReadWorkState,
-        startReading,
-        finishReading,
+        runWithReadModeOn,
         setSubscriptionMeansRequested,
         getRequestSubscriptionMeansState,
         resetReadWorkMode,
