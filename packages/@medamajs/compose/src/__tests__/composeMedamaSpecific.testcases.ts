@@ -121,12 +121,12 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       }));
 
       expect(readState1(selector1)).toEqual({ foo: 10, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       setState1({ a: { foo: 300 } });
       expect(readState1(selector1)).toEqual({ foo: 300, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
 
@@ -135,7 +135,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       });
 
       expect(readState1(selector1)).toEqual({ foo: 300, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
 
       type State2 = { a: { foo: number }; b: { bar: number }; c: { baz: string; qux: string } };
 
@@ -144,20 +144,20 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       selector1.mock.calls = [];
       expect(readState1(selector1)).toEqual({ foo: 300, bar: 20 });
       expect(readState2(selector2)).toEqual({ foo: 300, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       expect(readState2(selector1)).toEqual({ foo: 300, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
       setState2({ c: { baz: 'see' } });
       expect(readState1(selector1)).toEqual({ foo: 300, bar: 20 });
       expect(readState2(selector2)).toEqual({ foo: 300, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
 
       expect(readState2(selector2.bind(null))).toEqual({
         foo: 300,
@@ -178,7 +178,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: undefined,
       });
-      expect(selector3.mock.calls).toHaveLength(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -192,9 +192,9 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: 'let',
       });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(selector3.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(selector3).toHaveBeenCalledTimes(1);
 
       expect(readState2(selector2.bind(null))).toEqual({
         foo: 300,
@@ -220,9 +220,9 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: 'let',
       });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
     });
 
     test('adding new layers with init state works correctly', () => {
@@ -237,7 +237,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       }));
 
       expect(readState1(selector1)).toEqual({ foo: 10, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
 
@@ -251,7 +251,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       );
 
       expect(readState1(selector1)).toEqual({ foo: 10, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
 
       type State2 = {
         a: { foo: number };
@@ -270,20 +270,20 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       selector1.mock.calls = [];
       expect(readState1(selector1)).toEqual({ foo: 10, bar: 20 });
       expect(readState2(selector2)).toEqual({ foo: 10, bar: 20, baz: 'see', qux: 'let' });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       expect(readState2(selector1)).toEqual({ foo: 10, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
       setState2({ d: { quux: 400 } });
       expect(readState2(selector1)).toEqual({ foo: 10, bar: 20 });
       expect(readState2(selector2)).toEqual({ foo: 10, bar: 20, baz: 'see', qux: 'let' });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
 
       expect(readState2(selector2.bind(null))).toEqual({
         foo: 10,
@@ -317,15 +317,15 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState1(selector1, subscription1);
       expect(testValue1).toBe(30);
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       subscription1.mock.calls = [];
       setState1({ a: { foo: 300 } });
       expect(testValue1).toBe(320);
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       subscription1.mock.calls = [];
@@ -334,8 +334,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         c: createMedama<{ baz: string; qux: string }>(),
       });
 
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(subscription1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(0);
 
       type State2 = { a: { foo: number }; b: { bar: number }; c: { baz: string; qux: string } };
 
@@ -354,10 +354,10 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       subscribeToState2(selector2, subscription2);
       expect(testValue1).toBe(320);
       expect(testValue2).toBe('320 undefined undefined');
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -366,10 +366,10 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState2({ c: { baz: 'see' } });
       expect(testValue1).toBe(320);
       expect(testValue2).toBe('320 undefined undefined');
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(subscription1.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(0);
 
       const selector3 = jest.fn((state: State2) => ({
         ...state.a,
@@ -385,11 +385,11 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       subscribeToState2(selector3, subscription2);
       expect(testValue1).toBe(320);
       expect(testValue2).toBe('320 see undefined');
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -399,11 +399,11 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState2({ c: { qux: 'let' } });
       expect(testValue1).toBe(320);
       expect(testValue2).toBe('320 see let');
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -413,8 +413,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState2({ a: { foo: 500 } });
       expect(testValue1).toBe(520);
       expect(testValue2).toBe('520 see let');
-      expect(subscription1.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(2);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(2);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -424,11 +424,11 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState1({ a: { foo: 10 } });
       expect(testValue1).toBe(30);
       expect(testValue2).toBe('30 see let');
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(2);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(2);
     });
 
     test('deleting a layer works correctly', () => {
@@ -462,7 +462,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       setState1({ c: { baz: 'down' } });
@@ -473,7 +473,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       const { readState: readState2, setState: setState2 } = deleteLayers1('d');
@@ -484,7 +484,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
 
       const selector2 = jest.fn(
         (state: { a: { foo: number }; b: { bar: number }; c: { baz: string; qux: string } }) => ({
@@ -508,8 +508,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'down',
         qux: 'let',
       });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector2.mock.calls = [];
       expect(readState1(selector2)).toEqual({
@@ -518,7 +518,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'down',
         qux: 'let',
       });
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -536,8 +536,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: 'let',
       });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -555,8 +555,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: 'let',
       });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(0);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -574,8 +574,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         baz: 'see',
         qux: 'win',
       });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
     });
 
     test('deleting multiple layers works correctly', () => {
@@ -609,7 +609,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       setState1({ c: { baz: 'down' } });
@@ -620,7 +620,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       const { readState: readState2, setState: setState2 } = deleteLayers1(['c', 'd']);
@@ -631,7 +631,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         qux: 'let',
         quux: 400,
       });
-      expect(selector1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
 
       const selector2 = jest.fn((state: { a: { foo: number }; b: { bar: number } }) => ({
         ...state.a,
@@ -647,12 +647,12 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         quux: 400,
       });
       expect(readState2(selector2)).toEqual({ foo: 10, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector2.mock.calls = [];
       expect(readState1(selector2)).toEqual({ foo: 10, bar: 20 });
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -665,8 +665,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         quux: 400,
       });
       expect(readState2(selector2)).toEqual({ foo: 50, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -679,8 +679,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         quux: 500,
       });
       expect(readState2(selector2)).toEqual({ foo: 50, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(0);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -693,8 +693,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
         quux: 500,
       });
       expect(readState2(selector2)).toEqual({ foo: 50, bar: 20 });
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(0);
     });
 
     test('subscribing after deleting a layer works correctly', () => {
@@ -725,23 +725,23 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState1(selector1, subscription1);
       expect(testValue1).toBe('30 see let');
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       subscription1.mock.calls = [];
       setState1({ a: { foo: 300 } });
       expect(testValue1).toBe('320 see let');
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       subscription1.mock.calls = [];
 
       const { subscribeToState: subscribeToState2, setState: setState2 } = deleteLayers('c');
 
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(subscription1.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(0);
 
       const selector2 = jest.fn((state: { a: { foo: number }; b: { bar: number } }) => ({
         ...state.a,
@@ -759,10 +759,10 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       subscribeToState2(selector2, subscription2);
       expect(testValue1).toBe('320 see let');
       expect(testValue2).toBe(320);
-      expect(selector1.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -771,10 +771,10 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState2({ b: { bar: 500 } });
       expect(testValue1).toBe('800 see let');
       expect(testValue2).toBe(800);
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(subscription1.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       selector1.mock.calls = [];
       selector2.mock.calls = [];
@@ -783,10 +783,10 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       setState1({ c: { qux: 'nothing' } });
       expect(testValue1).toBe('800 see nothing');
       expect(testValue2).toBe(800);
-      expect(selector1.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(subscription1.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(0);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -807,8 +807,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState11(selector11, subscription11);
       expect(testValue11).toBe(10);
-      expect(selector11.mock.calls).toHaveLength(1);
-      expect(subscription11.mock.calls).toHaveLength(1);
+      expect(selector11).toHaveBeenCalledTimes(1);
+      expect(subscription11).toHaveBeenCalledTimes(1);
 
       const {
         setState: setState12,
@@ -825,8 +825,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState12(selector12, subscription12);
       expect(testValue12).toBe(40);
-      expect(selector12.mock.calls).toHaveLength(1);
-      expect(subscription12.mock.calls).toHaveLength(1);
+      expect(selector12).toHaveBeenCalledTimes(1);
+      expect(subscription12).toHaveBeenCalledTimes(1);
 
       const {
         setState: setState2,
@@ -852,8 +852,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState2(selector2, subscription2);
       expect(testValue2).toBe(100);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(1);
 
       const {
         setState: setState3,
@@ -874,8 +874,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState3(selector3, subscription3);
       expect(testValue3).toBe(60);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(subscription3.mock.calls).toHaveLength(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(1);
 
       const { setState: setState4, subscribeToState: subscribeToState4 } = addLayers3(
         { d: createMedama() },
@@ -900,8 +900,8 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
 
       subscribeToState4(selector4, subscription4);
       expect(testValue4).toBe(760);
-      expect(selector4.mock.calls).toHaveLength(1);
-      expect(subscription4.mock.calls).toHaveLength(1);
+      expect(selector4).toHaveBeenCalledTimes(1);
+      expect(subscription4).toHaveBeenCalledTimes(1);
 
       selector11.mock.calls = [];
       selector12.mock.calls = [];
@@ -919,16 +919,16 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       expect(testValue2).toBe(120);
       expect(testValue3).toBe(80);
       expect(testValue4).toBe(780);
-      expect(selector11.mock.calls).toHaveLength(1);
-      expect(selector12.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(selector4.mock.calls).toHaveLength(1);
-      expect(subscription11.mock.calls).toHaveLength(1);
-      expect(subscription12.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
-      expect(subscription3.mock.calls).toHaveLength(1);
-      expect(subscription4.mock.calls).toHaveLength(1);
+      expect(selector11).toHaveBeenCalledTimes(1);
+      expect(selector12).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(selector4).toHaveBeenCalledTimes(1);
+      expect(subscription11).toHaveBeenCalledTimes(1);
+      expect(subscription12).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(1);
+      expect(subscription4).toHaveBeenCalledTimes(1);
 
       selector11.mock.calls = [];
       selector12.mock.calls = [];
@@ -946,16 +946,16 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       expect(testValue2).toBe(160);
       expect(testValue3).toBe(80);
       expect(testValue4).toBe(780);
-      expect(selector11.mock.calls).toHaveLength(0);
-      expect(selector12.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(0);
-      expect(selector4.mock.calls).toHaveLength(0);
-      expect(subscription11.mock.calls).toHaveLength(0);
-      expect(subscription12.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(1);
-      expect(subscription3.mock.calls).toHaveLength(0);
-      expect(subscription4.mock.calls).toHaveLength(0);
+      expect(selector11).toHaveBeenCalledTimes(0);
+      expect(selector12).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(0);
+      expect(selector4).toHaveBeenCalledTimes(0);
+      expect(subscription11).toHaveBeenCalledTimes(0);
+      expect(subscription12).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(0);
+      expect(subscription4).toHaveBeenCalledTimes(0);
 
       selector11.mock.calls = [];
       selector12.mock.calls = [];
@@ -973,16 +973,16 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       expect(testValue2).toBe(210);
       expect(testValue3).toBe(130);
       expect(testValue4).toBe(830);
-      expect(selector11.mock.calls).toHaveLength(0);
-      expect(selector12.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(1);
-      expect(selector4.mock.calls).toHaveLength(1);
-      expect(subscription11.mock.calls).toHaveLength(0);
-      expect(subscription12.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(1);
-      expect(subscription3.mock.calls).toHaveLength(1);
-      expect(subscription4.mock.calls).toHaveLength(1);
+      expect(selector11).toHaveBeenCalledTimes(0);
+      expect(selector12).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(1);
+      expect(selector4).toHaveBeenCalledTimes(1);
+      expect(subscription11).toHaveBeenCalledTimes(0);
+      expect(subscription12).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(1);
+      expect(subscription4).toHaveBeenCalledTimes(1);
 
       selector11.mock.calls = [];
       selector12.mock.calls = [];
@@ -1000,16 +1000,16 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       expect(testValue2).toBe(210);
       expect(testValue3).toBe(130);
       expect(testValue4).toBe(1030);
-      expect(selector11.mock.calls).toHaveLength(0);
-      expect(selector12.mock.calls).toHaveLength(0);
-      expect(selector2.mock.calls).toHaveLength(0);
-      expect(selector3.mock.calls).toHaveLength(0);
-      expect(selector4.mock.calls).toHaveLength(1);
-      expect(subscription11.mock.calls).toHaveLength(0);
-      expect(subscription12.mock.calls).toHaveLength(0);
-      expect(subscription2.mock.calls).toHaveLength(0);
-      expect(subscription3.mock.calls).toHaveLength(0);
-      expect(subscription4.mock.calls).toHaveLength(1);
+      expect(selector11).toHaveBeenCalledTimes(0);
+      expect(selector12).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(selector3).toHaveBeenCalledTimes(0);
+      expect(selector4).toHaveBeenCalledTimes(1);
+      expect(subscription11).toHaveBeenCalledTimes(0);
+      expect(subscription12).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(0);
+      expect(subscription3).toHaveBeenCalledTimes(0);
+      expect(subscription4).toHaveBeenCalledTimes(1);
 
       selector11.mock.calls = [];
       selector12.mock.calls = [];
@@ -1027,16 +1027,16 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
       expect(testValue2).toBe(240);
       expect(testValue3).toBe(130);
       expect(testValue4).toBe(1030);
-      expect(selector11.mock.calls).toHaveLength(0);
-      expect(selector12.mock.calls).toHaveLength(1);
-      expect(selector2.mock.calls).toHaveLength(1);
-      expect(selector3.mock.calls).toHaveLength(0);
-      expect(selector4.mock.calls).toHaveLength(0);
-      expect(subscription11.mock.calls).toHaveLength(0);
-      expect(subscription12.mock.calls).toHaveLength(1);
-      expect(subscription2.mock.calls).toHaveLength(1);
-      expect(subscription3.mock.calls).toHaveLength(0);
-      expect(subscription4.mock.calls).toHaveLength(0);
+      expect(selector11).toHaveBeenCalledTimes(0);
+      expect(selector12).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(selector3).toHaveBeenCalledTimes(0);
+      expect(selector4).toHaveBeenCalledTimes(0);
+      expect(subscription11).toHaveBeenCalledTimes(0);
+      expect(subscription12).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(0);
+      expect(subscription4).toHaveBeenCalledTimes(0);
     });
   });
 };
