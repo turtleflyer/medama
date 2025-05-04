@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { createMedama } from 'medama';
-import { composeMedama, type CompositePupil, type DeleteLayers } from '..';
-import type { CompositeState } from '../auxiliaryTypes';
+import { composeMedama, type CompositePupil, type CompositeState, type DeleteLayers } from '..';
 import type { IsEqual, IsTrue } from '../IsEqual';
 
 const symbKey = Symbol('symbKey');
@@ -1723,11 +1722,11 @@ describe('types for medama layer', () => {
     >;
 
     () =>
+      // @ts-expect-error aa: boolean
       addLayers(
         { 22: createMedama<{ aa: boolean; 3: object }>(), [symbKey]: createMedama() },
 
         {
-          // @ts-expect-error aa: boolean
           22: { aa: 3, 3: { foo: 4 } },
           [symbKey]: { bb: { 44: 200 } },
         }
@@ -2035,6 +2034,7 @@ describe('types for medama layer', () => {
     >;
 
     () =>
+      // @ts-expect-error 33 missing
       addLayers(
         {
           a: composeMedama<{
@@ -2053,7 +2053,6 @@ describe('types for medama layer', () => {
           a: {
             [symbKey]: {
               cc: {
-                // @ts-expect-error 33 missing
                 quux: { dd: false },
               },
             },
@@ -2062,6 +2061,7 @@ describe('types for medama layer', () => {
       );
 
     () =>
+      // @ts-expect-error 33 missing
       addLayers(
         {
           a: composeMedama({
@@ -2077,7 +2077,6 @@ describe('types for medama layer', () => {
           a: {
             [symbKey]: {
               cc: {
-                // @ts-expect-error 33 missing
                 quux: { dd: false },
               },
             },
@@ -2348,5 +2347,37 @@ describe('types for medama layer', () => {
         }>
       >
     >;
+  });
+
+  test('types work with state type going down from generic binding of function', () => {
+    function testCase1<State extends object, Add extends object>() {
+      const { addLayers, pupil } = composeMedama({ foo: createMedama<State>() });
+
+      const v1 = pupil.readState((state) => state.foo);
+
+      const { pupil: newPupil } = addLayers({ bar: createMedama<Add>() });
+
+      const v2 = newPupil.readState((state) => state.bar);
+    }
+
+    function testCase2<
+      State extends { a: 1; 22: string; [symbKey]: { go: true } },
+      Add extends { 77: boolean },
+    >() {
+      const { addLayers, pupil } = composeMedama({ foo: createMedama<State>() });
+
+      const v1 = pupil.readState((state) => state.foo[symbKey]);
+
+      const { pupil: newPupil } = addLayers({ bar: createMedama<Add>() });
+
+      const v2 = newPupil.readState((state) => state.bar[77]);
+    }
+
+    function testCase3<State extends { a: 1; 22: string; [symbKey]: object }>() {
+      const { pupil } = composeMedama<{ foo: State }, {}>(
+        { foo: createMedama() },
+        { foo: { a: 1, 22: 'hi', [symbKey]: {} } }
+      );
+    }
   });
 });

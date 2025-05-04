@@ -8,12 +8,12 @@ export type CompositeState<State extends CStateG> = State & {
   [_COMPOSITE_STATE_SIGNATURE]?: true;
 };
 
-export type IsStateComposite<T> = true extends T[typeof _COMPOSITE_STATE_SIGNATURE & keyof T]
+export type IsCompositeState<T> = true extends T[typeof _COMPOSITE_STATE_SIGNATURE & keyof T]
   ? true
   : false;
 
 export type RevealLayersInStateRecursively<State extends CStateG> = {
-  [K in keyof State]?: IsStateComposite<State[K]> extends true
+  [K in keyof State]?: IsCompositeState<State[K]> extends true
     ? Omit<State[K], typeof _COMPOSITE_STATE_SIGNATURE> extends infer O
       ? O extends CStateG
         ? RevealLayersInStateRecursively<O>
@@ -23,7 +23,7 @@ export type RevealLayersInStateRecursively<State extends CStateG> = {
 };
 
 type RevealLayersInPupilsRecursively<T extends object, FR = true> =
-  IsStateComposite<T> extends true
+  IsCompositeState<T> extends true
     ? {
         [K in keyof T]: T[K] extends object ? RevealLayersInPupilsRecursively<T[K], false> : T[K];
       }
@@ -31,9 +31,23 @@ type RevealLayersInPupilsRecursively<T extends object, FR = true> =
       ? T
       : Partial<T>;
 
+export type LayerPupilsPreventInference<State extends CStateG> = CStateG extends State
+  ? never
+  : {
+      [K in keyof State]: Pupil<RevealLayersInPupilsRecursively<State[K]>>;
+    };
+
 export type LayerPupils<State extends CStateG> = {
-  [K in keyof State]: Pupil<RevealLayersInPupilsRecursively<State[K]>>;
+  [K in keyof State]: Pupil<State[K]>;
 };
+
+export type ExtendedWithStringAliases<K> = K | `${K & number}`;
+
+export type PickOriginalNumericKeys<K, SA> = K extends K
+  ? SA extends ExtendedWithStringAliases<K>
+    ? K
+    : never
+  : never;
 
 type MergeRecursively<T1, T2> = T1 extends object
   ? (
@@ -44,11 +58,11 @@ type MergeRecursively<T1, T2> = T1 extends object
               keyof T1,
               typeof _COMPOSITE_STATE_SIGNATURE
             >]: K extends ExtendedWithStringAliases<keyof T2>
-              ? MergeRecursively<T1[K], T2[PickWithMatchedNumericAliases<keyof T2, K>]>
+              ? MergeRecursively<T1[K], T2[PickOriginalNumericKeys<keyof T2, K>]>
               : T1[K];
           }
     ) extends infer R
-    ? IsStateComposite<T1> extends true
+    ? IsCompositeState<T1> extends true
       ? R extends CStateG
         ? CompositeState<R>
         : R
@@ -59,17 +73,9 @@ type MergeRecursively<T1, T2> = T1 extends object
 export type Merge<S, M extends { [K in keyof S]: unknown }> = Normalize<{
   [K in keyof S]: K extends ExtendedWithStringAliases<keyof M>
     ? MergeRecursively<S[K], M[K]> extends infer MR
-      ? MR extends {}
+      ? MR extends object
         ? MR
         : never
       : never
     : S[K];
 }>;
-
-export type PickWithMatchedNumericAliases<T, Gauge> = T extends T
-  ? Gauge extends T | `${T & number}`
-    ? T
-    : never
-  : never;
-
-export type ExtendedWithStringAliases<T> = T | `${T & number}`;

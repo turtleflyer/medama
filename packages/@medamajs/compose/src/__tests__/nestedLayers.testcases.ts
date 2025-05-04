@@ -5,9 +5,8 @@
 import { createMedama } from 'medama';
 import type { ComposeMedama, CompositePupil, IsComposite } from '..';
 import type {
-  CompositeState,
   CStateG,
-  LayerPupils,
+  LayerPupilsPreventInference,
   RevealLayersInStateRecursively,
 } from '../auxiliaryTypes';
 
@@ -23,7 +22,7 @@ export const compositeMedamaWithNestedLayers = (
     [
       'using `composeMedama` and resetting the state',
       (<State extends CStateG>(
-        layers: LayerPupils<State>,
+        layers: LayerPupilsPreventInference<State>,
         initState?: RevealLayersInStateRecursively<State>
       ) => {
         const pupilMethods = composeMedama<State>(layers);
@@ -114,7 +113,7 @@ export const compositeMedamaWithNestedLayers = (
     ],
   ])('medama layers test cases with nested layers (%s)', (_name, composeMedama) => {
     test('`readState` works correctly', () => {
-      const { readState } = composeMedama(
+      const { readState, pupil } = composeMedama(
         {
           a: composeMedama({
             10: createMedama(),
@@ -122,7 +121,7 @@ export const compositeMedamaWithNestedLayers = (
             [symbKey]: createMedama(),
           }),
 
-          1: createMedama(),
+          1: composeMedama({ 3: createMedama() }),
           [symbKey]: createMedama(),
         },
 
@@ -133,10 +132,12 @@ export const compositeMedamaWithNestedLayers = (
             [symbKey]: { 15: 'go' },
           },
 
-          1: { [symbKey]: 20, 2: 'twenty' },
+          1: { 3: { [symbKey]: 20, 22: 'twenty two' } },
           [symbKey]: { no: 'right', yes: false },
         }
       );
+
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
       const selector = jest.fn(
         ({
@@ -145,9 +146,12 @@ export const compositeMedamaWithNestedLayers = (
             foo: { [symbKey]: symb1 },
           },
 
-          1: { [symbKey]: symb2 },
+          1: {
+            3: { [symbKey]: symb2 },
+          },
+
           [symbKey]: { no },
-        }) => bar + symb1 + symb2 + no
+        }: State) => bar + symb1 + symb2 + no
       );
 
       expect(readState(selector)).toEqual('420right');
@@ -179,7 +183,9 @@ export const compositeMedamaWithNestedLayers = (
         }
       );
 
-      const fooSelector = jest.fn((state) => ({ ...state.a.foo }));
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
+
+      const fooSelector = jest.fn((state: State) => ({ ...state.a.foo }));
 
       expect(setState({ a: { foo: { [symbKey]: 500 } } })).toEqual({
         a: { foo: { [symbKey]: 500 } },
@@ -187,7 +193,7 @@ export const compositeMedamaWithNestedLayers = (
       expect(readState(fooSelector)).toEqual({ [symbKey]: 500 });
       expect(fooSelector).toHaveBeenCalledTimes(1);
 
-      const barSelector = jest.fn((state) => ({ ...state.a[10].bar }));
+      const barSelector = jest.fn((state: State) => ({ ...state.a[10].bar }));
 
       fooSelector.mock.calls = [];
       expect(setState({ a: { 10: { bar: { b: 'high' } } } })).toEqual({
@@ -197,18 +203,16 @@ export const compositeMedamaWithNestedLayers = (
       expect(fooSelector).toHaveBeenCalledTimes(0);
       expect(barSelector).toHaveBeenCalledTimes(1);
 
-      const fullSelector = jest.fn(
-        (state: CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>) => ({
-          a: {
-            10: { bar: { ...state.a[10].bar }, baz: { ...state.a[10].baz } },
-            foo: { ...state.a.foo },
-            [symbKey]: { ...state.a[symbKey] },
-          },
+      const fullSelector = jest.fn((state: State) => ({
+        a: {
+          10: { bar: { ...state.a[10].bar }, baz: { ...state.a[10].baz } },
+          foo: { ...state.a.foo },
+          [symbKey]: { ...state.a[symbKey] },
+        },
 
-          1: { ...state[1] },
-          [symbKey]: { no: { ...state[symbKey].no }, yes: { ...state[symbKey].yes } },
-        })
-      );
+        1: { ...state[1] },
+        [symbKey]: { no: { ...state[symbKey].no }, yes: { ...state[symbKey].yes } },
+      }));
 
       fooSelector.mock.calls = [];
       barSelector.mock.calls = [];
@@ -290,7 +294,7 @@ export const compositeMedamaWithNestedLayers = (
         { a: { aa: { aaa: 1 } }, b: { bb: { bbb: 10 } }, c: { cc: { ccc: { c1: 2, c2: 3 } } } }
       );
 
-      type State = CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>;
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
       const fullSelector = jest.fn((state: State) => ({
         a: { aa: { ...state.a.aa } },
@@ -493,12 +497,10 @@ export const compositeMedamaWithNestedLayers = (
     });
 
     test('self-firing is allowed in composition', () => {
-      const { readState, setState, subscribeToState, pupil } = composeMedama(
+      const { setState, subscribeToState } = composeMedama(
         { a: createMedama() },
         { a: { b: 500 } }
       );
-
-      type State = CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>;
 
       let testValue: number[] = [];
 
@@ -541,7 +543,7 @@ export const compositeMedamaWithNestedLayers = (
         { a: { aa: { aaa: 1 } }, b: { bb: { bbb: 10 } }, c: { cc: { ccc: { c1: 2, c2: 3 } } } }
       );
 
-      type State = CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>;
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
       const selector1 = jest.fn((state: State) => ({
         a: { aa: { ...state.a.aa } },
@@ -761,7 +763,11 @@ export const compositeMedamaWithNestedLayers = (
         }
       );
 
-      const { readState: readState1, deleteLayers } = addLayers(
+      const {
+        readState: readState1,
+        deleteLayers,
+        pupil,
+      } = addLayers(
         {
           a: composeMedama({
             10: createMedama(),
@@ -778,6 +784,8 @@ export const compositeMedamaWithNestedLayers = (
         }
       );
 
+      type StateWithAddedLayers = typeof pupil extends CompositePupil<infer S> ? S : never;
+
       const selector = jest.fn(
         ({
           a: {
@@ -787,7 +795,8 @@ export const compositeMedamaWithNestedLayers = (
 
           1: { [symbKey]: symb2 },
           [symbKey]: { no },
-        }) => bar + symb1 + symb2 + no
+        }: Omit<StateWithAddedLayers, '1'> & { 1: { [symbKey]: number } }) =>
+          bar + symb1 + symb2 + no
       );
 
       expect(readState1(selector)).toEqual('420right');
@@ -839,7 +848,9 @@ export const compositeMedamaWithNestedLayers = (
         }
       );
 
-      const fooSelector = jest.fn((state) => ({ ...state.a.foo }));
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
+
+      const fooSelector = jest.fn((state: State) => ({ ...state.a.foo }));
 
       expect(setState1({ a: { foo: { [symbKey]: 500 } } })).toEqual({
         a: { foo: { [symbKey]: 500 } },
@@ -847,7 +858,7 @@ export const compositeMedamaWithNestedLayers = (
       expect(readState1(fooSelector)).toEqual({ [symbKey]: 500 });
       expect(fooSelector).toHaveBeenCalledTimes(1);
 
-      const barSelector = jest.fn((state) => ({ ...state.a[10].bar }));
+      const barSelector = jest.fn((state: State) => ({ ...state.a[10].bar }));
 
       fooSelector.mock.calls = [];
       expect(setState1({ a: { 10: { bar: { b: 'high' } } } })).toEqual({
@@ -857,18 +868,16 @@ export const compositeMedamaWithNestedLayers = (
       expect(fooSelector).toHaveBeenCalledTimes(0);
       expect(barSelector).toHaveBeenCalledTimes(1);
 
-      const fullSelector = jest.fn(
-        (state: CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>) => ({
-          a: {
-            10: { bar: { ...state.a[10].bar }, baz: { ...state.a[10].baz } },
-            foo: { ...state.a.foo },
-            [symbKey]: { ...state.a[symbKey] },
-          },
+      const fullSelector = jest.fn((state: State) => ({
+        a: {
+          10: { bar: { ...state.a[10].bar }, baz: { ...state.a[10].baz } },
+          foo: { ...state.a.foo },
+          [symbKey]: { ...state.a[symbKey] },
+        },
 
-          1: { ...state[1] },
-          [symbKey]: { no: { ...state[symbKey].no }, yes: { ...state[symbKey].yes } },
-        })
-      );
+        1: { ...state[1] },
+        [symbKey]: { no: { ...state[symbKey].no }, yes: { ...state[symbKey].yes } },
+      }));
 
       fooSelector.mock.calls = [];
       barSelector.mock.calls = [];
@@ -1064,7 +1073,7 @@ export const compositeMedamaWithNestedLayers = (
         { c: { cc: { ccc: { c1: 2, c2: 3 } } } }
       );
 
-      type State = CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>;
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
       const fullSelector = jest.fn((state: State) => ({
         a: { aa: { ...state.a.aa } },
@@ -1488,7 +1497,7 @@ export const compositeMedamaWithNestedLayers = (
         { c: { cc: { ccc: { c1: 2, c2: 3 } } } }
       );
 
-      type State = CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>;
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
       const selector1 = jest.fn((state: State) => ({
         a: { aa: { ...state.a.aa } },
@@ -1932,6 +1941,8 @@ export const compositeMedamaWithNestedLayers = (
         }
       );
 
+      type State = typeof pupil extends CompositePupil<infer S> ? S : never;
+
       const levelDown = <L extends object>(layer: L): L =>
         Object.fromEntries(
           (Reflect.ownKeys(layer) as (keyof L)[])
@@ -1947,9 +1958,7 @@ export const compositeMedamaWithNestedLayers = (
             ])
         ) as L;
 
-      const selector = (
-        state: CompositeState<typeof pupil extends CompositePupil<infer S> ? S : never>
-      ) => levelDown(state);
+      const selector = (state: State) => levelDown(state);
 
       expect(readState(selector)).toEqual({
         a: {

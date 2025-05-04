@@ -4,8 +4,9 @@ import type {
   CStateG,
   ExtendedWithStringAliases,
   LayerPupils,
+  LayerPupilsPreventInference,
   Merge,
-  PickWithMatchedNumericAliases,
+  PickOriginalNumericKeys,
   RevealLayersInStateRecursively,
 } from './auxiliaryTypes';
 import type { Normalize } from './type-helpers/Normalize';
@@ -26,21 +27,21 @@ export type ResetCompositeState<State extends CStateG> = (
 ) => void;
 
 export type AddLayers<State extends CStateG> = {
-  <AddedState extends CStateG, Init extends RevealLayersInStateRecursively<AddedState>>(
+  <AddedState extends CStateG, Init extends RevealLayersInStateRecursively<State & AddedState>>(
     layers: LayerPupils<AddedState>,
     initState?: Init
   ): Normalize<CompositeMedama<Normalize<State & Merge<AddedState, Init>>>>;
 
   <AddedState extends CStateG>(
-    layers: LayerPupils<AddedState>,
-    initState?: RevealLayersInStateRecursively<AddedState>
+    layers: LayerPupilsPreventInference<AddedState>,
+    initState?: RevealLayersInStateRecursively<State & AddedState>
   ): Normalize<CompositeMedama<Normalize<State & AddedState>>>;
 };
 
 export type DeleteLayers<State extends CStateG> = <K extends string | number | symbol>(
   layersToDelete:
-    | PickWithMatchedNumericAliases<K, keyof State>
-    | (K[] & PickWithMatchedNumericAliases<K, keyof State>[])
+    | PickOriginalNumericKeys<K, keyof State>
+    | (K[] & PickOriginalNumericKeys<K, keyof State>[])
 ) => Normalize<CompositeMedama<Normalize<Omit<State, ExtendedWithStringAliases<K>>>>>;
 
 export type CompositePupil<State extends CStateG> = {
@@ -63,7 +64,7 @@ export type ComposeMedama = {
   ): Normalize<CompositeMedama<Merge<State, Init>>>;
 
   <State extends CStateG>(
-    layers: LayerPupils<State>,
+    layers: LayerPupilsPreventInference<State>,
     initState?: RevealLayersInStateRecursively<State>
   ): Normalize<CompositeMedama<State>>;
 };
@@ -71,3 +72,5 @@ export type ComposeMedama = {
 export type IsComposite = <State extends object>(
   state: State
 ) => state is State extends CStateG ? CompositeState<State> : never;
+
+export type { CompositeState };

@@ -2,7 +2,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createMedama } from 'medama';
 import type { ComposeMedama } from '..';
-import type { CStateG, LayerPupils, RevealLayersInStateRecursively } from '../auxiliaryTypes';
+import type {
+  CStateG,
+  LayerPupilsPreventInference,
+  RevealLayersInStateRecursively,
+} from '../auxiliaryTypes';
 
 export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
   describe.each([
@@ -11,7 +15,7 @@ export const compositeMedamaSpecificTest = (composeMedama: ComposeMedama) => {
     [
       'using `composeMedama` and resetting the state',
       (<State extends CStateG>(
-        layers: LayerPupils<State>,
+        layers: LayerPupilsPreventInference<State>,
         initState?: RevealLayersInStateRecursively<State>
       ) => {
         const pupilMethods = composeMedama<State>(layers);

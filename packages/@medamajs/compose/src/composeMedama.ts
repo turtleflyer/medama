@@ -12,6 +12,7 @@ import type {
   CStateG,
   CompositeState,
   LayerPupils,
+  LayerPupilsPreventInference,
   RevealLayersInStateRecursively,
 } from './auxiliaryTypes';
 import type { ComposeMedama, IsComposite } from './composeMedama.types';
@@ -303,7 +304,7 @@ export const composeMedama = (<State extends CStateG>(
     initState?: Partial<State & LayersToAdd>
   ) =>
     composeMedama<State & LayersToAdd>(
-      { ...layers, ...layersToAdd } as LayerPupils<State & LayersToAdd>,
+      { ...layers, ...layersToAdd } as LayerPupilsPreventInference<State & LayersToAdd>,
 
       initState as RevealLayersInStateRecursively<State & LayersToAdd> | undefined
     );
