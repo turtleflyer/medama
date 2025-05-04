@@ -11,6 +11,11 @@ import type {
 import { createSelectorStore } from './selectorStore';
 import { createStateImage } from './state';
 
+/**
+ * Factory function type for creating medama instances.
+ * Supports both complete and partial initial state.
+ * Returns normalized medama instance with pupil reference.
+ */
 export const createMedama: CreateMedama = <State extends object>(initState?: Partial<State>) => {
   let state = createStateImage(initState);
   let selectorStore = createSelectorStore(state.runOverState);
