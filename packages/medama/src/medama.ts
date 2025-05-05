@@ -49,7 +49,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
   const subscribeToState: SubscribeToState<State> = <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
-  ): SubscriptionMethods<V> => {
+  ): SubscriptionMethods<State, V> => {
     try {
       flagSubscriptionInProgress = true;
 

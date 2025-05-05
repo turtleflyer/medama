@@ -4,6 +4,7 @@ import type {
   Subscription,
   SubscriptionJob,
   SubscriptionMethods,
+  TransferSubscription,
   UnsubscribeFromState,
 } from './medama.types';
 import type { KeyHandle, KeyHandleCollector, RunOverState } from './state';
@@ -13,7 +14,7 @@ type GetSelectorValue<State extends object> = <V>(selector: Selector<State, V>) 
 type SubscribeToStateInSelectorStore<State extends object> = <V>(
   selector: Selector<State, V>,
   subscription: Subscription<V>
-) => SubscriptionMethods<V>;
+) => SubscriptionMethods<State, V>;
 
 /**
  * Creates a store to manage selectors and their associated records. Each
@@ -86,12 +87,13 @@ export const createSelectorStore = <State extends object>(
   const subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State> = <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
-  ): SubscriptionMethods<V> => {
+  ): SubscriptionMethods<State, V> => {
+    let currentSelector = selector;
     let unsubscribeHandle: UnsubscribeFromState | null = null;
     let currentRevealedSubscriptionJob: SubscriptionJob<V>;
 
     const evaluateAndSubscribe = (subscriptionToReveal: Subscription<V>): void => {
-      const { addSubscription, getValue } = getSelectorRecord(selector);
+      const { addSubscription, getValue } = getSelectorRecord(currentSelector);
       const possibleSubscriptionJob = subscriptionToReveal(getValue());
 
       currentRevealedSubscriptionJob =
@@ -114,7 +116,13 @@ export const createSelectorStore = <State extends object>(
       evaluateAndSubscribe(subscriptionToResubscribe);
     };
 
-    return { unsubscribe, resubscribe };
+    const transfer: TransferSubscription<State, V> = (selectorToTransferTo) => {
+      unsubscribe();
+      currentSelector = selectorToTransferTo;
+      evaluateAndSubscribe(currentRevealedSubscriptionJob);
+    };
+
+    return { unsubscribe, resubscribe, transfer };
   };
 
   return { getSelectorValue, subscribeToStateInSelectorStore };

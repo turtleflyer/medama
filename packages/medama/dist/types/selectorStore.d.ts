@@ -1,7 +1,7 @@
 import type { Selector, Subscription, SubscriptionJob, SubscriptionMethods } from './medama.types';
 import type { RunOverState } from './state';
 type GetSelectorValue<State extends object> = <V>(selector: Selector<State, V>) => V;
-type SubscribeToStateInSelectorStore<State extends object> = <V>(selector: Selector<State, V>, subscription: Subscription<V>) => SubscriptionMethods<V>;
+type SubscribeToStateInSelectorStore<State extends object> = <V>(selector: Selector<State, V>, subscription: Subscription<V>) => SubscriptionMethods<State, V>;
 export declare const createSelectorStore: <State extends object>(runOverState: RunOverState<State, unknown>) => {
     getSelectorValue: GetSelectorValue<State>;
     subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State>;

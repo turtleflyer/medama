@@ -6,6 +6,7 @@ import {
   type Subscription,
   type SubscriptionJob,
   type SubscriptionMethods,
+  type TransferSubscription,
   type UnsubscribeFromState,
 } from 'medama';
 import type {
@@ -203,7 +204,7 @@ export const composeMedama = (<State extends CStateG>(
   const subscribeToState = <V>(
     compositeSelector: Selector<State, V>,
     subscription: Subscription<V>
-  ): SubscriptionMethods<V> => {
+  ): SubscriptionMethods<State, V> => {
     try {
       /**
        * Calculate compositeSelector result to ensure selector record exists in
@@ -213,6 +214,7 @@ export const composeMedama = (<State extends CStateG>(
        */
       readState(compositeSelector);
 
+      let currentSelectorStoreRecord = selectorStore.get(compositeSelector) as SelectorRecord<V>;
       let unsubscribeHandle: UnsubscribeFromState | null = null;
       let currentRevealedSubscriptionJob: SubscriptionJob<V>;
 
@@ -225,10 +227,7 @@ export const composeMedama = (<State extends CStateG>(
          */
         startUpdating();
 
-        const { addSubscription, getValue } = selectorStore.get(
-          compositeSelector
-        ) as SelectorRecord<V>;
-
+        const { addSubscription, getValue } = currentSelectorStoreRecord;
         const possibleSubscriptionJob = subscriptionToReveal(getValue());
 
         currentRevealedSubscriptionJob =
@@ -254,7 +253,16 @@ export const composeMedama = (<State extends CStateG>(
         evaluateAndSubscribe(subscriptionToResubscribe);
       };
 
-      return { unsubscribe, resubscribe };
+      const transfer: TransferSubscription<State, V> = (selectorToTransferTo) => {
+        unsubscribe();
+        readState(selectorToTransferTo);
+
+        currentSelectorStoreRecord = selectorStore.get(selectorToTransferTo) as SelectorRecord<V>;
+
+        evaluateAndSubscribe(currentRevealedSubscriptionJob);
+      };
+
+      return { unsubscribe, resubscribe, transfer };
     } catch (e) {
       initReset();
 

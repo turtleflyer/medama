@@ -11,10 +11,11 @@ export const createSelectorStore = (runOverState) => {
         return getValue();
     };
     const subscribeToStateInSelectorStore = (selector, subscription) => {
+        let currentSelector = selector;
         let unsubscribeHandle = null;
         let currentRevealedSubscriptionJob;
         const evaluateAndSubscribe = (subscriptionToReveal) => {
-            const { addSubscription, getValue } = getSelectorRecord(selector);
+            const { addSubscription, getValue } = getSelectorRecord(currentSelector);
             const possibleSubscriptionJob = subscriptionToReveal(getValue());
             currentRevealedSubscriptionJob =
                 typeof possibleSubscriptionJob === 'function'
@@ -31,7 +32,12 @@ export const createSelectorStore = (runOverState) => {
             unsubscribe();
             evaluateAndSubscribe(subscriptionToResubscribe);
         };
-        return { unsubscribe, resubscribe };
+        const transfer = (selectorToTransferTo) => {
+            unsubscribe();
+            currentSelector = selectorToTransferTo;
+            evaluateAndSubscribe(currentRevealedSubscriptionJob);
+        };
+        return { unsubscribe, resubscribe, transfer };
     };
     return { getSelectorValue, subscribeToStateInSelectorStore };
 };

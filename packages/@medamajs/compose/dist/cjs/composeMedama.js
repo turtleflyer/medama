@@ -57,11 +57,12 @@ exports.composeMedama = ((layers, initState) => {
     const subscribeToState = (compositeSelector, subscription) => {
         try {
             readState(compositeSelector);
+            let currentSelectorStoreRecord = selectorStore.get(compositeSelector);
             let unsubscribeHandle = null;
             let currentRevealedSubscriptionJob;
             const evaluateAndSubscribe = (subscriptionToReveal) => {
                 startUpdating();
-                const { addSubscription, getValue } = selectorStore.get(compositeSelector);
+                const { addSubscription, getValue } = currentSelectorStoreRecord;
                 const possibleSubscriptionJob = subscriptionToReveal(getValue());
                 currentRevealedSubscriptionJob =
                     typeof possibleSubscriptionJob === 'function'
@@ -79,7 +80,13 @@ exports.composeMedama = ((layers, initState) => {
                 unsubscribe();
                 evaluateAndSubscribe(subscriptionToResubscribe);
             };
-            return { unsubscribe, resubscribe };
+            const transfer = (selectorToTransferTo) => {
+                unsubscribe();
+                readState(selectorToTransferTo);
+                currentSelectorStoreRecord = selectorStore.get(selectorToTransferTo);
+                evaluateAndSubscribe(currentRevealedSubscriptionJob);
+            };
+            return { unsubscribe, resubscribe, transfer };
         }
         catch (e) {
             initReset();
