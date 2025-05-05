@@ -1848,13 +1848,15 @@ export const medamaTest = (createMedama: CreateMedama) => {
 
     test('selector remember its dependent state keys', () => {
       type State = { a: number; b: number };
+
       const { setState, subscribeToState } = createMedama<State>({ a: 1, b: 10 });
 
       let selectorFirstRun = true;
 
-      const selector = jest.fn((state: State) => {
-        return [selectorFirstRun ? { ...state } : state.a, (selectorFirstRun = false)];
-      });
+      const selector = jest.fn((state: State) => [
+        selectorFirstRun ? { ...state } : state.a,
+        (selectorFirstRun = false),
+      ]);
 
       const { unsubscribe } = subscribeToState(selector, () => {});
 

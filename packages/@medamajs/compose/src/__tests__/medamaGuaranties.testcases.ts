@@ -2144,5 +2144,76 @@ export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
       expect(testValue).toEqual({ newFoo: 100, newBar: 200, newBaz: 'go' });
       expect(selector).toHaveBeenCalledTimes(1);
     });
+
+    test('selector remember its dependent state keys', () => {
+      type State = { a: { foo: number; bar: number }; b: { baz: number } };
+
+      const { setState, subscribeToState } = composeMedama<State>(
+        { a: createMedama(), b: createMedama() },
+        { a: { foo: 1, bar: 20 }, b: { baz: 300 } }
+      );
+
+      let selectorFirstRun = true;
+
+      const selector = jest.fn((state: State) => [
+        selectorFirstRun ? { a: { ...state.a }, b: { ...state.b } } : state.a.foo,
+        (selectorFirstRun = false),
+      ]);
+
+      const { unsubscribe } = subscribeToState(selector, () => {});
+
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: { foo: 2 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: { bar: 30 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ b: { baz: 400 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      unsubscribe();
+      setState({ a: { foo: 3 } });
+      expect(selector).toHaveBeenCalledTimes(0);
+
+      selector.mock.calls = [];
+
+      setState({ a: { bar: 40 } });
+      expect(selector).toHaveBeenCalledTimes(0);
+
+      selector.mock.calls = [];
+
+      setState({ b: { baz: 500 } });
+      expect(selector).toHaveBeenCalledTimes(0);
+
+      selector.mock.calls = [];
+
+      subscribeToState(selector, () => {});
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: { foo: 4 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ a: { bar: 50 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+
+      selector.mock.calls = [];
+
+      setState({ b: { baz: 600 } });
+      expect(selector).toHaveBeenCalledTimes(1);
+    });
   });
 };
