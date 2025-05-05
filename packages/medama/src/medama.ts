@@ -1,5 +1,6 @@
 import type {
   CreateMedama,
+  Medama,
   ReadState,
   ResetState,
   Selector,
@@ -102,7 +103,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
     resetInit();
   };
 
-  const pupil = { subscribeToState, resetState, setState, readState };
+  const pupil = { subscribeToState, resetState, setState, readState } as Medama<State>;
 
-  return { ...pupil, pupil };
+  return Object.assign(pupil, { pupil });
 };

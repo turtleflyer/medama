@@ -2215,5 +2215,14 @@ export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
       setState({ b: { baz: 600 } });
       expect(selector).toHaveBeenCalledTimes(1);
     });
+
+    test('verify return object of composeMedama and pupil reference the same object', () => {
+      const medama = composeMedama(
+        { a: createMedama(), b: createMedama() },
+        { a: { foo: 1, bar: 20 }, b: { baz: 300 } }
+      );
+
+      expect(medama).toBe(medama.pupil);
+    });
   });
 };

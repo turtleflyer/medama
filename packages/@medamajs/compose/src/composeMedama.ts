@@ -16,7 +16,7 @@ import type {
   LayerPupilsPreventInference,
   RevealLayersInStateRecursively,
 } from './auxiliaryTypes';
-import type { ComposeMedama, IsComposite } from './composeMedama.types';
+import type { ComposeMedama, CompositeMedama, IsComposite } from './composeMedama.types';
 import { _COMPOSITE_STATE_SIGNATURE, _RELAY_SUBSCRIPTION_MEANS } from './const';
 import { forEachOnOwnNumerableProps } from './forEachOnOwnNumerableProps';
 import { createJobQueue } from './jobQueue';
@@ -74,7 +74,7 @@ type SubscriptionMeansInState = {
 export const composeMedama = (<State extends CStateG>(
   layers: Record<keyof State, Pupil<State[keyof State]>>,
   initState?: Partial<State>
-): Pupil<State> => {
+): CompositeMedama<State> => {
   const {
     addToQueue: addToStateQueue,
     processQueue: processStateQueue,
@@ -317,7 +317,7 @@ export const composeMedama = (<State extends CStateG>(
       initState as RevealLayersInStateRecursively<State & LayersToAdd> | undefined
     );
 
-  const deleteLayers = <K extends keyof State>(layersToDelete: K | K[]) => {
+  const deleteLayers = (layersToDelete: string | string[]) => {
     const nextLayers = { ...layers };
 
     (Array.isArray(layersToDelete) ? layersToDelete : [layersToDelete]).forEach((layerK) => {
@@ -325,7 +325,7 @@ export const composeMedama = (<State extends CStateG>(
       delete nextLayers[layerK];
     });
 
-    return composeMedama(nextLayers as LayerPupils<State>);
+    return composeMedama(nextLayers as LayerPupils<CStateG>);
   };
 
   const pupil = {
@@ -333,16 +333,11 @@ export const composeMedama = (<State extends CStateG>(
     subscribeToState,
     setState,
     resetState,
-  };
-
-  const toReturn = {
-    ...pupil,
-    pupil,
     addLayers,
     deleteLayers,
-  };
+  } as CompositeMedama<State>;
 
-  return toReturn;
+  return Object.assign(pupil, { pupil });
 }) as ComposeMedama;
 
 type ProcessLayer<State extends CStateG> = (

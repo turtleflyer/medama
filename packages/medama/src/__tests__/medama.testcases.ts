@@ -1898,5 +1898,10 @@ export const medamaTest = (createMedama: CreateMedama) => {
       setState({ b: 40 });
       expect(selector).toHaveBeenCalledTimes(1);
     });
+
+    test('verify return object of createMedama and pupil reference the same object', () => {
+      const medama = createMedama({ a: 1, b: 10 });
+      expect(medama).toBe(medama.pupil);
+    });
   });
 };

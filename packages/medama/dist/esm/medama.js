@@ -53,6 +53,6 @@ export const createMedama = (initState) => {
         resetInit();
     };
     const pupil = { subscribeToState, resetState, setState, readState };
-    return Object.assign(Object.assign({}, pupil), { pupil });
+    return Object.assign(pupil, { pupil });
 };
 //# sourceMappingURL=medama.js.map

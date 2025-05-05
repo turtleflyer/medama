@@ -130,11 +130,10 @@ exports.composeMedama = ((layers, initState) => {
         subscribeToState,
         setState,
         resetState,
-    };
-    const toReturn = Object.assign(Object.assign({}, pupil), { pupil,
         addLayers,
-        deleteLayers });
-    return toReturn;
+        deleteLayers,
+    };
+    return Object.assign(pupil, { pupil });
 });
 const createLayerProcessorWithSubscriptionMeans = () => {
     const subscriptionMeans = [];
