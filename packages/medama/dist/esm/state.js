@@ -1,87 +1,82 @@
 export const createStateImage = (initState) => {
     let calculationAllowed = false;
-    let triggerJobRoutine = null;
-    const triggerJobStore = {};
-    const { addToPool, runPool } = createJobPool();
     const restrictCalculation = () => {
         if (!calculationAllowed)
             throw new Error('Medama Error: The object has no access to its properties');
     };
     const runWithRestrictionLifted = (toRun) => {
         calculationAllowed = true;
-        return [toRun(), (calculationAllowed = false), (triggerJobRoutine = null)][0];
+        return [toRun(), (calculationAllowed = false)][0];
     };
-    const readStateFromImage = (selector) => runWithRestrictionLifted(() => selector(state));
-    const writeState = (toWrite) => {
+    let activeKeyHandleCollector;
+    const runOverState = (selector, keyHandleCollector) => {
+        activeKeyHandleCollector = keyHandleCollector;
+        return [
+            runWithRestrictionLifted(() => selector(state)),
+            (activeKeyHandleCollector = undefined),
+        ][0];
+    };
+    const triggerJobStore = {};
+    const { addToQueue, runQueue } = createJobQueue();
+    const createKeyHandleRecord = () => {
+        const triggerSet = new Set();
+        const keyHandle = (trigger) => {
+            triggerSet.add(trigger);
+            return () => {
+                triggerSet.delete(trigger);
+            };
+        };
+        const fireKey = () => {
+            addToQueue(triggerSet);
+        };
+        return { keyHandle, fireKey };
+    };
+    const setState = (stateChange) => [
         runWithRestrictionLifted(() => {
-            Object.assign(state, toWrite);
-        });
-        runPool();
-    };
-    const registerSelectorTrigger = (selectorTrigger) => {
-        triggerJobRoutine = createRegisterTriggerJob(selectorTrigger);
-        return readStateFromImage;
-    };
+            const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
+            Object.assign(state, mergeToState);
+            return mergeToState;
+        }),
+        runQueue(),
+    ][0];
     const proxyHandler = {
         get: (target, p) => {
             var _a;
             var _b;
             restrictCalculation();
-            if (triggerJobRoutine) {
-                const triggerStoreRec = ((_a = triggerJobStore[_b = p]) !== null && _a !== void 0 ? _a : (triggerJobStore[_b] = new Set()));
-                triggerJobRoutine(triggerStoreRec);
+            if (activeKeyHandleCollector) {
+                const { keyHandle } = ((_a = triggerJobStore[_b = p]) !== null && _a !== void 0 ? _a : (triggerJobStore[_b] = createKeyHandleRecord()));
+                activeKeyHandleCollector(keyHandle);
             }
             return target[p];
         },
         set: (target, p, newValue) => {
+            var _a;
             restrictCalculation();
             const oldValue = target[p];
             target[p] = newValue;
-            const rec = triggerJobStore[p];
-            if (rec && !Object.is(oldValue, newValue))
-                addToPool(rec);
+            const { fireKey } = (_a = triggerJobStore[p]) !== null && _a !== void 0 ? _a : {};
+            if (fireKey && !Object.is(oldValue, newValue))
+                fireKey();
             return true;
         },
     };
     const state = new Proxy(Object.assign({}, initState), proxyHandler);
-    return { writeState, registerSelectorTrigger };
+    return { runOverState, setState };
 };
-export const createRegisterTriggerJob = (selectorTrigger) => {
-    const unregisterPool = new Set();
-    const runUnregister = () => {
-        unregisterPool.forEach((unregJob) => {
-            unregJob();
+export const createJobQueue = () => {
+    const queue = new Set();
+    const addToQueue = (triggerSet) => {
+        triggerSet.forEach((trigger) => {
+            queue.add(trigger);
         });
     };
-    const triggerJob = () => {
-        selectorTrigger() || runUnregister();
-    };
-    const registerTriggerJob = (triggerJobSet) => {
-        triggerJobSet.add(triggerJob);
-        unregisterPool.add(() => {
-            triggerJobSet.delete(triggerJob);
+    const runQueue = () => {
+        queue.forEach((trigger) => {
+            trigger();
         });
+        queue.clear();
     };
-    return registerTriggerJob;
-};
-export const createJobPool = () => {
-    const pool = new Set();
-    let haveAlreadyBeenRun = new WeakSet();
-    const addToPool = (jobs) => {
-        pool.add(jobs);
-    };
-    const runPool = () => {
-        pool.forEach((chunk) => {
-            chunk.forEach((job) => {
-                if (haveAlreadyBeenRun.has(job))
-                    return;
-                job();
-                haveAlreadyBeenRun.add(job);
-            });
-        });
-        pool.clear();
-        haveAlreadyBeenRun = new WeakSet();
-    };
-    return { addToPool, runPool };
+    return { addToQueue, runQueue };
 };
 //# sourceMappingURL=state.js.map

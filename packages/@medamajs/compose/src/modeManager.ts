@@ -1,5 +1,14 @@
 import { createMedama } from 'medama';
 
+/**
+ * Function to execute job with read mode enabled. Sets read work state to true
+ * before execution, resets both read work and subscription means states after
+ * completion.
+ *
+ * @param job Function to execute in read mode
+ */
+type RunWithReadModeOn = (job: () => void) => void;
+
 type ReadWorkModeMethods = {
   /**
    * Returns current read work state. True indicates that reading process is in
@@ -9,17 +18,11 @@ type ReadWorkModeMethods = {
   getReadWorkState: () => boolean;
 
   /**
-   * Sets read work state to true, indicating start of reading process. Used to
-   * mark that any subsequent nested reads should be treated as derivative
-   * calls.
+   * Function to execute job with read mode enabled. Sets read work state to
+   * true before execution, resets both read work and subscription means states
+   * after completion.
    */
-  startReading: () => void;
-
-  /**
-   * Sets read work state and subscription means requested state to false. Marks
-   * completion of reading process and subscription collection.
-   */
-  finishReading: () => void;
+  runWithReadModeOn: RunWithReadModeOn;
 
   /**
    * Sets subscription means requested state to true. Indicates that nested
@@ -61,11 +64,9 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods => {
 
   const getReadWorkState = (): boolean => readWorkState;
 
-  const startReading = (): void => {
+  const runWithReadModeOn = (job: () => void): void => {
     readWorkState = true;
-  };
-
-  const finishReading = (): void => {
+    job();
     readWorkState = false;
     requestSubscriptionMeansState = false;
   };
@@ -83,13 +84,16 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods => {
 
   return {
     getReadWorkState,
-    startReading,
-    finishReading,
+    runWithReadModeOn,
     setSubscriptionMeansRequested,
     getRequestSubscriptionMeansState,
     resetReadWorkMode,
   };
 };
+
+export type DeferOrRun = (job: () => void) => void;
+
+type Reset = () => void;
 
 type ConditionalDeferrerMethods = {
   /**
@@ -98,14 +102,19 @@ type ConditionalDeferrerMethods = {
    * - If in update mode: defers job and subscribes to resolution signal (if not
    *   already subscribed)
    */
-  deferOrRun: (job: () => void) => void;
+  deferOrRun: DeferOrRun;
 
   /**
    * Resets subscription state to false. Used during initialization and error
    * handling to ensure clean state.
    */
-  reset: () => void;
+  reset: Reset;
 };
+
+type CreateConditionalDeferrer = (
+  deferJob: (job: () => void) => void,
+  resolveDeferred: () => void
+) => ConditionalDeferrerMethods;
 
 type UpdateWorkModeMethods = {
   /**
@@ -134,10 +143,7 @@ type UpdateWorkModeMethods = {
    * @param deferJob Function to add job to deferred queue
    * @param resolveDeferred Function to process deferred queue
    */
-  createConditionalDeferrer: (
-    deferJob: (job: () => void) => void,
-    resolveDeferred: () => void
-  ) => ConditionalDeferrerMethods;
+  createConditionalDeferrer: CreateConditionalDeferrer;
 
   /**
    * Resets signal state and update work state to false. Used during

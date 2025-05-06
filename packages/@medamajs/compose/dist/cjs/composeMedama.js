@@ -1,15 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.composeMedama = exports.isComposite = void 0;
+exports.isComposite = exports.composeMedama = void 0;
 const const_1 = require("./const");
 const forEachOnOwnNumerableProps_1 = require("./forEachOnOwnNumerableProps");
 const jobQueue_1 = require("./jobQueue");
 const modeManager_1 = require("./modeManager");
-const retrieveWithUpdateRequest_1 = require("./retrieveWithUpdateRequest");
 const traverseThroughPupils_1 = require("./traverseThroughPupils");
-const { getReadWorkState, startReading, finishReading, setSubscriptionMeansRequested, getRequestSubscriptionMeansState, resetReadWorkMode, } = (0, modeManager_1.createReadWorkModeManager)();
+const { getReadWorkState, runWithReadModeOn, setSubscriptionMeansRequested, getRequestSubscriptionMeansState, resetReadWorkMode, } = (0, modeManager_1.createReadWorkModeManager)();
 const { getUpdateWorkState, startUpdating, signalDeferredJobsToResolve, createConditionalDeferrer, resetUpdateWorkMode, } = (0, modeManager_1.createUpdateWorkModeManager)();
-const composeMedama = (layers, initState) => {
+exports.composeMedama = ((layers, initState) => {
     const { addToQueue: addToStateQueue, processQueue: processStateQueue, resetQueue: resetStateQueue, } = (0, jobQueue_1.createJobQueue)();
     const { deferOrRun: addToStateQueueAndSubscribeOrRun, reset: resetStateQueueSubscription } = createConditionalDeferrer(addToStateQueue, processStateQueue);
     const initReset = () => {
@@ -28,9 +27,13 @@ const composeMedama = (layers, initState) => {
     let selectorStore = new WeakMap();
     const readState = (compositeSelector) => {
         try {
+            if (selectorStore.has(compositeSelector)) {
+                const { getValue } = selectorStore.get(compositeSelector);
+                return getValue();
+            }
             const { processLayer, getSubscriptionMeans } = createLayerProcessorWithSubscriptionMeans();
             const isInitiator = !getReadWorkState();
-            const getResult = () => (0, traverseThroughPupils_1.traverseThroughPupils)(pupilRecords, processLayer, !isInitiator && getRequestSubscriptionMeansState()
+            const calculateResultFromLayers = () => (0, traverseThroughPupils_1.traverseThroughPupils)(pupilRecords, processLayer, !isInitiator && getRequestSubscriptionMeansState()
                 ? (combinedLayers) => {
                     combinedLayers[const_1._RELAY_SUBSCRIPTION_MEANS] =
                         getSubscriptionMeans();
@@ -38,28 +41,13 @@ const composeMedama = (layers, initState) => {
                 }
                 : compositeSelector);
             if (isInitiator) {
-                if (!selectorStore.has(compositeSelector)) {
-                    const addJobToSubscriptionPool = createAddJobToSubscriptionPoolMethod(addToStateQueueAndSubscribeOrRun, getSubscriptionMeans);
-                    const { retrieve: getSelectorResult, requestUpdate } = (0, retrieveWithUpdateRequest_1.retrieveWithUpdateRequest)(() => {
-                        startReading();
-                        return [getResult(), finishReading(), addJobToSubscriptionPool(requestUpdate)][0];
-                    });
-                    const subscribeJobToSelector = (subscriptionJob) => {
-                        const jobToAdd = () => {
-                            subscriptionJob(getSelectorResult());
-                        };
-                        return addJobToSubscriptionPool(jobToAdd);
-                    };
-                    selectorStore.set(compositeSelector, {
-                        subscribe: subscribeJobToSelector,
-                        read: getSelectorResult,
-                    });
-                    setSubscriptionMeansRequested();
-                }
-                const { read } = selectorStore.get(compositeSelector);
-                return read();
+                const selectorRecord = createSelectorRecord(calculateResultFromLayers, addToStateQueueAndSubscribeOrRun, getSubscriptionMeans);
+                selectorStore.set(compositeSelector, selectorRecord);
+                setSubscriptionMeansRequested();
+                const { getValue } = selectorRecord;
+                return getValue();
             }
-            return getResult();
+            return calculateResultFromLayers();
         }
         catch (e) {
             initReset();
@@ -69,28 +57,36 @@ const composeMedama = (layers, initState) => {
     const subscribeToState = (compositeSelector, subscription) => {
         try {
             readState(compositeSelector);
-            const { subscribe, read } = selectorStore.get(compositeSelector);
-            const subscribeEvaluatedSubscription = (subscriptionToEvaluate) => {
+            let currentSelectorStoreRecord = selectorStore.get(compositeSelector);
+            let unsubscribeHandle = null;
+            let currentRevealedSubscriptionJob;
+            const evaluateAndSubscribe = (subscriptionToReveal) => {
                 startUpdating();
-                const possibleSubscriptionJob = subscriptionToEvaluate(read());
-                return [
-                    subscribe(typeof possibleSubscriptionJob === 'function'
+                const { addSubscription, getValue } = currentSelectorStoreRecord;
+                const possibleSubscriptionJob = subscriptionToReveal(getValue());
+                currentRevealedSubscriptionJob =
+                    typeof possibleSubscriptionJob === 'function'
                         ? possibleSubscriptionJob
-                        : subscriptionToEvaluate),
-                    signalDeferredJobsToResolve(),
-                ][0];
+                        : subscriptionToReveal;
+                unsubscribeHandle = addSubscription(currentRevealedSubscriptionJob);
+                signalDeferredJobsToResolve();
             };
-            let unsubscribeHandle = subscribeEvaluatedSubscription(subscription);
-            return {
-                unsubscribe: () => {
-                    unsubscribeHandle === null || unsubscribeHandle === void 0 ? void 0 : unsubscribeHandle();
-                    unsubscribeHandle = null;
-                },
-                resubscribe: (subscriptionToEvaluate) => {
-                    unsubscribeHandle === null || unsubscribeHandle === void 0 ? void 0 : unsubscribeHandle();
-                    unsubscribeHandle = subscribeEvaluatedSubscription(subscriptionToEvaluate);
-                },
+            evaluateAndSubscribe(subscription);
+            const unsubscribe = () => {
+                unsubscribeHandle === null || unsubscribeHandle === void 0 ? void 0 : unsubscribeHandle();
+                unsubscribeHandle = null;
             };
+            const resubscribe = (subscriptionToResubscribe) => {
+                unsubscribe();
+                evaluateAndSubscribe(subscriptionToResubscribe);
+            };
+            const transfer = (selectorToTransferTo) => {
+                unsubscribe();
+                readState(selectorToTransferTo);
+                currentSelectorStoreRecord = selectorStore.get(selectorToTransferTo);
+                evaluateAndSubscribe(currentRevealedSubscriptionJob);
+            };
+            return { unsubscribe, resubscribe, transfer };
         }
         catch (e) {
             initReset();
@@ -121,25 +117,24 @@ const composeMedama = (layers, initState) => {
         });
         selectorStore = new WeakMap();
     };
-    const addLayers = (layersToAdd, initState) => composeMedama(Object.assign(Object.assign({}, layers), layersToAdd), initState);
+    const addLayers = (layersToAdd, initState) => (0, exports.composeMedama)(Object.assign(Object.assign({}, layers), layersToAdd), initState);
     const deleteLayers = (layersToDelete) => {
         const nextLayers = Object.assign({}, layers);
         (Array.isArray(layersToDelete) ? layersToDelete : [layersToDelete]).forEach((layerK) => {
             delete nextLayers[layerK];
         });
-        return composeMedama(nextLayers);
+        return (0, exports.composeMedama)(nextLayers);
     };
     const pupil = {
         readState,
         subscribeToState,
         setState,
         resetState,
-    };
-    const toReturn = Object.assign(Object.assign({}, pupil), { pupil,
         addLayers,
-        deleteLayers });
-    return toReturn;
-};
+        deleteLayers,
+    };
+    return Object.assign(pupil, { pupil });
+});
 const createLayerProcessorWithSubscriptionMeans = () => {
     const subscriptionMeans = [];
     const processLayer = (key, layerState, subscribeToLayer, selectorIdentity, combinedLayers = Object.defineProperty(Object.create(null), const_1._COMPOSITE_STATE_SIGNATURE, {
@@ -163,24 +158,14 @@ const createLayerProcessorWithSubscriptionMeans = () => {
     const getSubscriptionMeans = () => subscriptionMeans;
     return { processLayer, getSubscriptionMeans };
 };
-const createAddJobToSubscriptionPoolMethod = (addToStateQueueAndSubscribeOrRun, getSubscriptionMeans) => {
-    let isPoolSubscriptionActive = false;
+const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun, getSubscriptionMeans) => {
     let unsubscribePoolFromLayers;
-    const subscriptionPool = new Set();
-    const runSubscriptionPool = () => {
-        subscriptionPool.forEach((piece) => {
-            piece();
-        });
-        if (subscriptionPool.size === 1) {
-            unsubscribePoolFromLayers();
-            isPoolSubscriptionActive = false;
-        }
-    };
-    const keepSubscriptionConsistent = () => {
-        if (isPoolSubscriptionActive)
+    let isRegistered = false;
+    const registerTrigger = () => {
+        if (isRegistered)
             return;
         const determineSubscriptionPoolExecution = () => {
-            addToStateQueueAndSubscribeOrRun(runSubscriptionPool);
+            addToStateQueueAndSubscribeOrRun(selectorTrigger);
         };
         const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer) => subscribeToLayer(() => determineSubscriptionPoolExecution));
         unsubscribePoolFromLayers = () => {
@@ -188,19 +173,44 @@ const createAddJobToSubscriptionPoolMethod = (addToStateQueueAndSubscribeOrRun, 
                 unsubscribe();
             });
         };
-        isPoolSubscriptionActive = true;
+        isRegistered = true;
     };
-    const addJobToSubscriptionPool = (job) => {
-        subscriptionPool.add(job);
-        keepSubscriptionConsistent();
+    let memValue;
+    let isToRecalculateValue = true;
+    const runSelectorWithMemoization = () => {
+        if (isToRecalculateValue) {
+            runWithReadModeOn(() => {
+                memValue = calculateResult();
+            });
+            isToRecalculateValue = false;
+        }
+    };
+    const jobs = new Set();
+    const selectorTrigger = () => {
+        isToRecalculateValue = true;
+        if (jobs.size === 0) {
+            unsubscribePoolFromLayers();
+            isRegistered = false;
+            return;
+        }
+        runSelectorWithMemoization();
+        jobs.forEach((job) => {
+            job(memValue);
+        });
+    };
+    const addSubscription = (subscriptionJob) => {
+        jobs.add(subscriptionJob);
         return () => {
-            subscriptionPool.delete(job);
+            jobs.delete(subscriptionJob);
         };
     };
-    return addJobToSubscriptionPool;
+    const getValue = () => {
+        runSelectorWithMemoization();
+        registerTrigger();
+        return memValue;
+    };
+    return { addSubscription, getValue };
 };
 const isComposite = (state) => const_1._COMPOSITE_STATE_SIGNATURE in state;
 exports.isComposite = isComposite;
-const _composeMedama = composeMedama;
-exports.composeMedama = _composeMedama;
 //# sourceMappingURL=composeMedama.js.map

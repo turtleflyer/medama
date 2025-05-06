@@ -1,18 +1,30 @@
 import {
   type Pupil,
+  type Resubscribe,
   type Selector,
   type SubscribeToState,
   type Subscription,
   type SubscriptionJob,
   type SubscriptionMethods,
+  type TransferSubscription,
+  type UnsubscribeFromState,
 } from 'medama';
-import type { CStateG, CompositeState } from './auxiliaryTypes';
-import type { ComposeMedama, IsComposite } from './composeMedama.types';
+import type {
+  CStateG,
+  CompositeState,
+  LayerPupils,
+  LayerPupilsPreventInference,
+  RevealLayersInStateRecursively,
+} from './auxiliaryTypes';
+import type { ComposeMedama, CompositeMedama, IsComposite } from './composeMedama.types';
 import { _COMPOSITE_STATE_SIGNATURE, _RELAY_SUBSCRIPTION_MEANS } from './const';
 import { forEachOnOwnNumerableProps } from './forEachOnOwnNumerableProps';
 import { createJobQueue } from './jobQueue';
-import { createReadWorkModeManager, createUpdateWorkModeManager } from './modeManager';
-import { retrieveWithUpdateRequest } from './retrieveWithUpdateRequest';
+import {
+  createReadWorkModeManager,
+  createUpdateWorkModeManager,
+  type DeferOrRun,
+} from './modeManager';
 import { traverseThroughPupils } from './traverseThroughPupils';
 
 /**
@@ -22,8 +34,7 @@ import { traverseThroughPupils } from './traverseThroughPupils';
  */
 const {
   getReadWorkState,
-  startReading,
-  finishReading,
+  runWithReadModeOn,
   setSubscriptionMeansRequested,
   getRequestSubscriptionMeansState,
   resetReadWorkMode,
@@ -36,23 +47,6 @@ const {
   createConditionalDeferrer,
   resetUpdateWorkMode,
 } = createUpdateWorkModeManager();
-
-type SubscribeJobToKnownSelector<V> = (job: SubscriptionJob<V>) => () => void;
-
-type SelectorStoreRecord<V> = {
-  /**
-   * Function to subscribe to selector value changes. Takes a subscription job
-   * and returns cleanup function. Uses memoized selector result to avoid
-   * recalculations.
-   */
-  subscribe: SubscribeJobToKnownSelector<V>;
-
-  /**
-   * Function to read current selector value. Returns memoized result,
-   * recalculating only when state changes.
-   */
-  read: () => V;
-};
 
 type SubscriptionMeansInState = {
   /**
@@ -77,10 +71,10 @@ type SubscriptionMeansInState = {
  * state. This pupil can be used as a layer in subsequent composeMedama calls
  * for higher-level composition.
  */
-const composeMedama = <State extends CStateG>(
+export const composeMedama = (<State extends CStateG>(
   layers: Record<keyof State, Pupil<State[keyof State]>>,
   initState?: Partial<State>
-): Pupil<State> => {
+): CompositeMedama<State> => {
   const {
     addToQueue: addToStateQueue,
     processQueue: processStateQueue,
@@ -125,10 +119,16 @@ const composeMedama = <State extends CStateG>(
    * are no longer referenced, preventing memory leaks in long-running
    * applications.
    */
-  let selectorStore = new WeakMap<Selector<State, unknown>, SelectorStoreRecord<unknown>>();
+  let selectorStore = new WeakMap<Selector<State, unknown>, SelectorRecord<unknown>>();
 
   const readState = <V>(compositeSelector: Selector<State, V>): V => {
     try {
+      if (selectorStore.has(compositeSelector)) {
+        const { getValue } = selectorStore.get(compositeSelector) as SelectorRecord<V>;
+
+        return getValue();
+      }
+
       const { processLayer, getSubscriptionMeans } =
         createLayerProcessorWithSubscriptionMeans<State>();
 
@@ -146,8 +146,7 @@ const composeMedama = <State extends CStateG>(
 
       /**
        * Calculates the result for compositeSelector by:
-       * 1. Traversing through all nested states to build a combined state
-       *    object
+       * 1. Traversing through all nested states to build a combined state object
        * 2. Optionally collecting and combining subscription means from nested
        *    layers to propagate them up the chain
        * 3. Applying the compositeSelector to the final combined state
@@ -155,7 +154,7 @@ const composeMedama = <State extends CStateG>(
        * For non-initiator calls with subscription means requested, it adds
        * collected subscription means to the state before passing to selector.
        */
-      const getResult = (): V =>
+      const calculateResultFromLayers = (): V =>
         traverseThroughPupils(
           pupilRecords,
           processLayer,
@@ -176,74 +175,25 @@ const composeMedama = <State extends CStateG>(
        * states use their selectors only once and don't need memoization.
        */
       if (isInitiator) {
-        if (!selectorStore.has(compositeSelector)) {
-          const addJobToSubscriptionPool = createAddJobToSubscriptionPoolMethod(
-            addToStateQueueAndSubscribeOrRun,
-            getSubscriptionMeans
-          );
+        const selectorRecord = createSelectorRecord(
+          calculateResultFromLayers,
+          addToStateQueueAndSubscribeOrRun,
+          getSubscriptionMeans
+        );
 
-          const { retrieve: getSelectorResult, requestUpdate } = retrieveWithUpdateRequest(
-            (): V => {
-              /**
-               * Marks the start of reading state. Ensures any subsequent reads
-               * of nested composite layers are treated as derivative calls,
-               * maintaining both proper subscription chain propagation and
-               * selector memoization process through the layer hierarchy.
-               */
-              startReading();
+        /**
+         * Store read and subscribe methods for this selector in WeakMap. These
+         * methods are memoized to avoid recalculating selector results and
+         * rebuilding subscription chains on subsequent reads.
+         */
+        selectorStore.set(compositeSelector, selectorRecord);
+        setSubscriptionMeansRequested();
+        const { getValue } = selectorRecord;
 
-              /**
-               * Returns an array with:
-               * 1. Result from getResult()
-               * 2. finishReading() to mark end of state reading and
-               *    subscription collection
-               * 3. Adding service job to subscription pool that requests
-               *    selector value updates when state changes occur
-               *
-               * Returns first element (getResult value) via [0] index
-               */
-              return (
-                [getResult(), finishReading(), addJobToSubscriptionPool(requestUpdate)] as const
-              )[0];
-            }
-          );
-
-          /**
-           * Creates subscription handler for a known selector. When called:
-           * 1. Wraps the subscription job to use memoized selector result
-           * 2. Adds wrapped job to subscription pool
-           * 3. Returns cleanup function to remove job from pool
-           *
-           * @param subscriptionJob Function to run when selector value changes
-           * @returns Cleanup function to remove subscription
-           */
-          const subscribeJobToSelector: SubscribeJobToKnownSelector<V> = (subscriptionJob) => {
-            const jobToAdd = (): void => {
-              subscriptionJob(getSelectorResult());
-            };
-
-            return addJobToSubscriptionPool(jobToAdd);
-          };
-
-          /**
-           * Store read and subscribe methods for this selector in WeakMap.
-           * These methods are memoized to avoid recalculating selector results
-           * and rebuilding subscription chains on subsequent reads.
-           */
-          selectorStore.set(compositeSelector, {
-            subscribe: subscribeJobToSelector,
-            read: getSelectorResult,
-          });
-
-          setSubscriptionMeansRequested();
-        }
-
-        const { read } = selectorStore.get(compositeSelector) as SelectorStoreRecord<V>;
-
-        return read();
+        return getValue();
       }
 
-      return getResult();
+      return calculateResultFromLayers();
     } catch (e) {
       initReset();
 
@@ -254,7 +204,7 @@ const composeMedama = <State extends CStateG>(
   const subscribeToState = <V>(
     compositeSelector: Selector<State, V>,
     subscription: Subscription<V>
-  ): SubscriptionMethods<V> => {
+  ): SubscriptionMethods<State, V> => {
     try {
       /**
        * Calculate compositeSelector result to ensure selector record exists in
@@ -263,11 +213,12 @@ const composeMedama = <State extends CStateG>(
        * subscription functions.
        */
       readState(compositeSelector);
-      const { subscribe, read } = selectorStore.get(compositeSelector) as SelectorStoreRecord<V>;
 
-      const subscribeEvaluatedSubscription = (
-        subscriptionToEvaluate: Subscription<V>
-      ): (() => void) => {
+      let currentSelectorStoreRecord = selectorStore.get(compositeSelector) as SelectorRecord<V>;
+      let unsubscribeHandle: UnsubscribeFromState | null = null;
+      let currentRevealedSubscriptionJob: SubscriptionJob<V>;
+
+      const evaluateAndSubscribe = (subscriptionToReveal: Subscription<V>): void => {
         /**
          * Allow state mutations during subscription setup - a distinct feature
          * of composite state. Original medama would error on state changes
@@ -275,36 +226,43 @@ const composeMedama = <State extends CStateG>(
          * and resolving deferred jobs after subscription setup.
          */
         startUpdating();
-        const possibleSubscriptionJob = subscriptionToEvaluate(read());
 
-        return (
-          [
-            subscribe(
-              typeof possibleSubscriptionJob === 'function'
-                ? possibleSubscriptionJob
-                : subscriptionToEvaluate
-            ),
+        const { addSubscription, getValue } = currentSelectorStoreRecord;
+        const possibleSubscriptionJob = subscriptionToReveal(getValue());
 
-            // Signal completion of potential state mutations during
-            // subscription
-            signalDeferredJobsToResolve(),
-          ] as const
-        )[0];
+        currentRevealedSubscriptionJob =
+          typeof possibleSubscriptionJob === 'function'
+            ? possibleSubscriptionJob
+            : subscriptionToReveal;
+
+        unsubscribeHandle = addSubscription(currentRevealedSubscriptionJob);
+
+        // Signal completion of potential state mutations during subscription
+        signalDeferredJobsToResolve();
       };
 
-      let unsubscribeHandle: (() => void) | null = subscribeEvaluatedSubscription(subscription);
+      evaluateAndSubscribe(subscription);
 
-      return {
-        unsubscribe: (): void => {
-          unsubscribeHandle?.();
-          unsubscribeHandle = null;
-        },
-
-        resubscribe: (subscriptionToEvaluate: Subscription<V>): void => {
-          unsubscribeHandle?.();
-          unsubscribeHandle = subscribeEvaluatedSubscription(subscriptionToEvaluate);
-        },
+      const unsubscribe: UnsubscribeFromState = () => {
+        unsubscribeHandle?.();
+        unsubscribeHandle = null;
       };
+
+      const resubscribe: Resubscribe<V> = (subscriptionToResubscribe) => {
+        unsubscribe();
+        evaluateAndSubscribe(subscriptionToResubscribe);
+      };
+
+      const transfer: TransferSubscription<State, V> = (selectorToTransferTo) => {
+        unsubscribe();
+        readState(selectorToTransferTo);
+
+        currentSelectorStoreRecord = selectorStore.get(selectorToTransferTo) as SelectorRecord<V>;
+
+        evaluateAndSubscribe(currentRevealedSubscriptionJob);
+      };
+
+      return { unsubscribe, resubscribe, transfer };
     } catch (e) {
       initReset();
 
@@ -351,18 +309,15 @@ const composeMedama = <State extends CStateG>(
 
   const addLayers = <LayersToAdd extends CStateG>(
     layersToAdd: Record<keyof LayersToAdd, Pupil<LayersToAdd[keyof LayersToAdd]>>,
-    initState?: Partial<LayersToAdd>
-  ): Pupil<State & LayersToAdd> =>
+    initState?: Partial<State & LayersToAdd>
+  ) =>
     composeMedama<State & LayersToAdd>(
-      { ...layers, ...layersToAdd } as Record<
-        keyof State | keyof LayersToAdd,
-        Pupil<(State & LayersToAdd)[keyof State | keyof LayersToAdd]>
-      >,
+      { ...layers, ...layersToAdd } as LayerPupilsPreventInference<State & LayersToAdd>,
 
-      initState as (State & LayersToAdd) | undefined
+      initState as RevealLayersInStateRecursively<State & LayersToAdd> | undefined
     );
 
-  const deleteLayers = <K extends keyof State>(layersToDelete: K | K[]): Pupil<Omit<State, K>> => {
+  const deleteLayers = (layersToDelete: string | string[]) => {
     const nextLayers = { ...layers };
 
     (Array.isArray(layersToDelete) ? layersToDelete : [layersToDelete]).forEach((layerK) => {
@@ -370,9 +325,7 @@ const composeMedama = <State extends CStateG>(
       delete nextLayers[layerK];
     });
 
-    return composeMedama(
-      nextLayers as Record<keyof State, Pupil<Omit<State, K>[Exclude<keyof State, K>]>>
-    );
+    return composeMedama(nextLayers as LayerPupils<CStateG>);
   };
 
   const pupil = {
@@ -380,17 +333,12 @@ const composeMedama = <State extends CStateG>(
     subscribeToState,
     setState,
     resetState,
-  };
-
-  const toReturn = {
-    ...pupil,
-    pupil,
     addLayers,
     deleteLayers,
-  };
+  } as CompositeMedama<State>;
 
-  return toReturn;
-};
+  return Object.assign(pupil, { pupil });
+}) as ComposeMedama;
 
 type ProcessLayer<State extends CStateG> = (
   key: keyof State,
@@ -467,48 +415,72 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
 };
 
 /**
- * Creates a method to manage subscription pooling for composite selectors.
- * Maintains a pool of subscription jobs that need to run when state changes.
- * Ensures consistent subscription handling by:
- * - Creating a single combined subscription for all nested states
- * - Starting subscription when first job is added to empty pool
- * - Stopping subscription after pool execution `reveals only the selector update
- *   request job remains (this job is always present to keep selector result
- *   current)
+ * Adds subscription job to run when selector value changes. Returns cleanup
+ * function to remove subscription.
  *
- * @param addToStateQueueAndSubscribeOrRun Method to queue or immediately run
- * state updates
- * @param getSubscriptionMeans Method to get combined subscription methods from
- * nested states
- * @returns Function that:
- *          - Takes a job to add to subscription pool
- *          - Returns cleanup function to remove job from pool
+ * @template V The type of the selector value
  */
-const createAddJobToSubscriptionPoolMethod = (
-  addToStateQueueAndSubscribeOrRun: (job: () => void) => void,
+type AddSubscription<V> = (subscriptionJob: SubscriptionJob<V>) => () => void;
+
+/**
+ * Gets memoized selector value, recalculating only if needed. Ensures selector
+ * is registered even without active subscriptions.
+ *
+ * @template V The type of the selector value
+ */
+type GetValue<V> = () => V;
+
+type SelectorRecord<V> = {
+  /**
+   * Adds subscription job to run when selector value changes. Returns cleanup
+   * function to remove subscription.
+   */
+  addSubscription: AddSubscription<V>;
+
+  /**
+   * Gets memoized selector value, recalculating only if needed. Ensures
+   * selector is registered even without active subscriptions.
+   */
+  getValue: GetValue<V>;
+};
+
+/**
+ * Creates a record to manage selector value calculation and subscriptions.
+ * Handles:
+ * - Lazy calculation of selector value with memoization
+ * - Subscription management for state changes
+ * - Automatic cleanup when no subscriptions remain
+ *
+ * @param calculateResult Function to compute selector value
+ * @param addToStateQueueAndSubscribeOrRun Function to handle state updates
+ * @param getSubscriptionMeans Function to get subscription methods
+ * @returns Record with methods for value retrieval and subscription management
+ */
+const createSelectorRecord = <V>(
+  calculateResult: () => V,
+  addToStateQueueAndSubscribeOrRun: DeferOrRun,
   getSubscriptionMeans: GetSubscriptionMeans
-): ((job: () => void) => () => void) => {
-  let isPoolSubscriptionActive = false;
+): SelectorRecord<V> => {
+  /**
+   * Function to unsubscribe from all nested layer subscriptions
+   */
   let unsubscribePoolFromLayers: () => void;
 
-  const subscriptionPool = new Set<() => void>();
+  /**
+   * Indicates if the selector is currently registered with subscriptions
+   */
+  let isRegistered = false;
 
-  const runSubscriptionPool = (): void => {
-    subscriptionPool.forEach((piece) => {
-      piece();
-    });
-
-    if (subscriptionPool.size === 1) {
-      unsubscribePoolFromLayers();
-      isPoolSubscriptionActive = false;
-    }
-  };
-
-  const keepSubscriptionConsistent = (): void => {
-    if (isPoolSubscriptionActive) return;
+  /**
+   * Registers selector's subscriptions with nested layers. Creates combined
+   * subscription from all layer subscriptions. Prevents duplicate registrations
+   * via isRegistered flag.
+   */
+  const registerTrigger = (): void => {
+    if (isRegistered) return;
 
     const determineSubscriptionPoolExecution = (): void => {
-      addToStateQueueAndSubscribeOrRun(runSubscriptionPool);
+      addToStateQueueAndSubscribeOrRun(selectorTrigger);
     };
 
     const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer): (() => void) =>
@@ -521,19 +493,75 @@ const createAddJobToSubscriptionPoolMethod = (
       });
     };
 
-    isPoolSubscriptionActive = true;
+    isRegistered = true;
   };
 
-  const addJobToSubscriptionPool = (job: () => void): (() => void) => {
-    subscriptionPool.add(job);
-    keepSubscriptionConsistent();
+  /**
+   * Memoized selector result value
+   */
+  let memValue: V;
+
+  /**
+   * Flag indicating if selector value needs recalculation
+   */
+  let isToRecalculateValue = true;
+
+  /**
+   * Recalculates selector value only if dependencies have changed. Runs
+   * calculation in read mode to ensure proper dependency tracking.
+   */
+  const runSelectorWithMemoization = (): void => {
+    if (isToRecalculateValue) {
+      runWithReadModeOn(() => {
+        memValue = calculateResult();
+      });
+
+      isToRecalculateValue = false;
+    }
+  };
+
+  /**
+   * Collection of subscription jobs that run when selector value changes
+   */
+  const jobs = new Set<SubscriptionJob<V>>();
+
+  /**
+   * Triggered when selector dependencies change. Handles recalculation and
+   * subscription notifications. Cleans up when no subscriptions remain.
+   */
+  const selectorTrigger = (): void => {
+    isToRecalculateValue = true;
+
+    if (jobs.size === 0) {
+      unsubscribePoolFromLayers();
+      isRegistered = false;
+
+      return;
+    }
+
+    runSelectorWithMemoization();
+
+    jobs.forEach((job): void => {
+      job(memValue);
+    });
+  };
+
+  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
+    jobs.add(subscriptionJob);
 
     return () => {
-      subscriptionPool.delete(job);
+      jobs.delete(subscriptionJob);
     };
   };
 
-  return addJobToSubscriptionPool;
+  const getValue: GetValue<V> = () => {
+    runSelectorWithMemoization();
+    registerTrigger();
+
+    return memValue;
+  };
+
+  return { addSubscription, getValue };
 };
 
 /**
@@ -551,7 +579,3 @@ export const isComposite: IsComposite = <State extends object>(
   state: State
 ): state is State extends CStateG ? CompositeState<State> : never =>
   _COMPOSITE_STATE_SIGNATURE in state;
-
-const _composeMedama = composeMedama as ComposeMedama;
-
-export { _composeMedama as composeMedama };

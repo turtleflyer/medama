@@ -1,14 +1,19 @@
-import type { ReadState } from './medama.types';
-type SelectorTrigger = () => boolean;
+import type { ReadState, Selector, SetState } from './medama.types';
+export type SelectorTrigger = () => void;
+type UnregisterTriggerFromKeyHandle = () => void;
+export type KeyHandle = (trigger: SelectorTrigger) => UnregisterTriggerFromKeyHandle;
+export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
 export type RegisterSelectorTrigger<State extends object> = (selectorTrigger: SelectorTrigger) => ReadState<State>;
+export type RunOverState<State extends object, V> = (selector: Selector<State, V>, keyHandleCollector?: KeyHandleCollector) => V;
 export declare const createStateImage: <State extends object>(initState?: Partial<State>) => {
-    writeState: (toWrite: Partial<State>) => void;
-    registerSelectorTrigger: (selectorTrigger: SelectorTrigger) => ReadState<State>;
+    runOverState: RunOverState<State, unknown>;
+    setState: SetState<State>;
 };
-export declare const createRegisterTriggerJob: (selectorTrigger: SelectorTrigger) => (triggerJobSet: Set<() => void>) => void;
-export declare const createJobPool: () => {
-    addToPool: (jobs: Set<() => void>) => void;
-    runPool: () => void;
+type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
+type RunQueue = () => void;
+export declare const createJobQueue: () => {
+    addToQueue: AddToQueue;
+    runQueue: RunQueue;
 };
 export {};
 //# sourceMappingURL=state.d.ts.map

@@ -2,7 +2,7 @@ import { createSelectorStore } from './selectorStore';
 import { createStateImage } from './state';
 export const createMedama = (initState) => {
     let state = createStateImage(initState);
-    let selectorStore = createSelectorStore(state.registerSelectorTrigger);
+    let selectorStore = createSelectorStore(state.runOverState);
     let flagSubscriptionInProgress = false;
     let flagStateUpdating = false;
     const resetInit = () => {
@@ -12,10 +12,10 @@ export const createMedama = (initState) => {
     const subscribeToState = (selector, subscription) => {
         try {
             flagSubscriptionInProgress = true;
-            const toReturn = createResubscribeStore((sub) => selectorStore.subscribeToStateInSelectorStore(selector, sub));
-            toReturn.resubscribe(subscription);
-            flagSubscriptionInProgress = false;
-            return toReturn;
+            return [
+                selectorStore.subscribeToStateInSelectorStore(selector, subscription),
+                (flagSubscriptionInProgress = false),
+            ][0];
         }
         catch (e) {
             resetInit();
@@ -38,12 +38,7 @@ export const createMedama = (initState) => {
             if (flagStateUpdating)
                 throw new Error('Medama Error: A subscription job launches the state update');
             flagStateUpdating = true;
-            const mergeToState = typeof stateChange === 'function'
-                ? selectorStore.getSelectorValue(stateChange)
-                : stateChange;
-            state.writeState(mergeToState);
-            flagStateUpdating = false;
-            return mergeToState;
+            return [state.setState(stateChange), (flagStateUpdating = false)][0];
         }
         catch (e) {
             resetInit();
@@ -52,23 +47,12 @@ export const createMedama = (initState) => {
     };
     const resetState = (initState) => {
         const newState = createStateImage(initState);
-        const newSelectorStore = createSelectorStore(newState.registerSelectorTrigger);
+        const newSelectorStore = createSelectorStore(newState.runOverState);
         state = newState;
         selectorStore = newSelectorStore;
+        resetInit();
     };
     const pupil = { subscribeToState, resetState, setState, readState };
-    return Object.assign(Object.assign({}, pupil), { pupil });
-};
-const createResubscribeStore = (subscribe) => {
-    let unsubscribeFromRecentSubscription = null;
-    const unsubscribe = () => {
-        unsubscribeFromRecentSubscription === null || unsubscribeFromRecentSubscription === void 0 ? void 0 : unsubscribeFromRecentSubscription();
-        unsubscribeFromRecentSubscription = null;
-    };
-    const resubscribe = (subscription) => {
-        unsubscribeFromRecentSubscription === null || unsubscribeFromRecentSubscription === void 0 ? void 0 : unsubscribeFromRecentSubscription();
-        unsubscribeFromRecentSubscription = subscribe(subscription);
-    };
-    return { unsubscribe, resubscribe };
+    return Object.assign(pupil, { pupil });
 };
 //# sourceMappingURL=medama.js.map

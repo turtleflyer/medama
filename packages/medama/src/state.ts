@@ -1,176 +1,252 @@
-import type { ReadState } from './medama.types';
+import type { ReadState, Selector, SetState } from './medama.types';
+
+export type SelectorTrigger = () => void;
+
+type UnregisterTriggerFromKeyHandle = () => void;
 
 /**
- * The return of the trigger is an indicator of it being valid. Otherwise it'll be invalidated and
- * removed.
+ * Function to register a selector's trigger with a state property. When
+ * property value changes, registered trigger is called. Returns cleanup
+ * function to unregister trigger.
  */
-type SelectorTrigger = () => boolean;
+export type KeyHandle = (trigger: SelectorTrigger) => UnregisterTriggerFromKeyHandle;
+
+export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
 
 export type RegisterSelectorTrigger<State extends object> = (
   selectorTrigger: SelectorTrigger
 ) => ReadState<State>;
 
-type ProxyHandler<State> = {
-  get: <K extends string | symbol>(target: State, p: K) => State[K & keyof State];
-  set: <K extends string | symbol>(target: State, p: K, newValue: State[K & keyof State]) => true;
+type KeyHandleRecord = {
+  keyHandle: KeyHandle;
+  fireKey: () => void;
 };
 
+type GetFromTarget<State> = <K extends string | symbol>(
+  target: State,
+  p: K
+) => State[K & keyof State];
+
+type SetToTarget<State> = <K extends string | symbol>(
+  target: State,
+  p: K,
+  newValue: State[K & keyof State]
+) => true;
+
+type ProxyHandler<State> = {
+  get: GetFromTarget<State>;
+  set: SetToTarget<State>;
+};
+
+export type RunOverState<State extends object, V> = (
+  selector: Selector<State, V>,
+  keyHandleCollector?: KeyHandleCollector
+) => V;
+
 /**
- * The state image is a core flat object holding the state records. It provides an access to them
- * through a Proxy wrapping around it and manages reading and writing only via dedicated methods
- * preventing unauthorized use.
+ * Creates core state management system with controlled access and subscription
+ * handling. Provides:
+ * - Proxy-wrapped state object with access restrictions
+ * - Dependency tracking during selector execution
+ * - Subscription management for state changes
+ * - Methods for reading and updating state
+ *
+ * @param initState Optional initial state values
+ * @returns Methods for running selectors over state and updating state
  */
-export const createStateImage = <State extends object>(initState?: Partial<State>) => {
-  /**
-   * Determines authorized access to the state
-   */
+export const createStateImage = <State extends object>(
+  initState?: Partial<State>
+): {
+  runOverState: RunOverState<State, unknown>;
+  setState: SetState<State>;
+} => {
   let calculationAllowed = false;
 
   /**
-   * Handler used for registering the selector trigger to establish dependency for the selector.
+   * Enforces authorized access to state properties. Throws error if attempting
+   * to access state outside of:
+   * - Selector execution
+   * - State update operations
    */
-  let triggerJobRoutine: RegisterTriggerJob | null = null;
-
-  /**
-   * The map of property keys of the state to the trigger jobs that fires when the value of
-   * corresponding property changes.
-   */
-  const triggerJobStore: Partial<Record<keyof State, Set<() => void>>> = {};
-  const { addToPool, runPool } = createJobPool();
-
-  const restrictCalculation = () => {
+  const restrictCalculation = (): void => {
     if (!calculationAllowed)
       throw new Error('Medama Error: The object has no access to its properties');
   };
 
-  const runWithRestrictionLifted = <V>(toRun: () => V) => {
+  /**
+   * Temporarily allows state property access during execution of provided
+   * function. Sets calculationAllowed flag to true before execution and resets
+   * it after. Used during selector execution and state updates.
+   *
+   * @param toRun Function to execute with state access allowed
+   * @returns Result of executed function
+   */
+  const runWithRestrictionLifted = <V>(toRun: () => V): V => {
     calculationAllowed = true;
 
-    return ([toRun(), (calculationAllowed = false), (triggerJobRoutine = null)] as const)[0];
-  };
-
-  const readStateFromImage: ReadState<State> = (selector) =>
-    runWithRestrictionLifted(() => selector(state));
-
-  const writeState = (toWrite: Partial<State>) => {
-    runWithRestrictionLifted(() => {
-      Object.assign(state, toWrite);
-    });
-
-    runPool();
-  };
-
-  const registerSelectorTrigger = (selectorTrigger: SelectorTrigger) => {
-    triggerJobRoutine = createRegisterTriggerJob(selectorTrigger);
-
-    return readStateFromImage;
+    return ([toRun(), (calculationAllowed = false)] as const)[0];
   };
 
   /**
-   * Used to create a Proxy for the state object being passed to a selector. It has 3 function:
-   * 1. To track the dependency for the selector (registerSelectorTrigger).
-   * 2. To see what state property has a value changed to trigger subscriptions of dependent
-   *    selectors.
-   * 3. Manage authorized access to the state (preventing its capture and using outside the
-   *    selector).
+   * Tracks current key handle collector during selector execution. Set when
+   * running selector to collect state property dependencies. Used by proxy
+   * handler to register key handles for accessed properties. Reset to undefined
+   * after selector execution completes.
+   */
+  let activeKeyHandleCollector: KeyHandleCollector | undefined;
+
+  /**
+   * Executes selector over state with dependency tracking.
+   * - Sets active key handle collector for dependency tracking
+   * - Runs selector with authorized access to state properties
+   * - Resets collector after execution
+   *
+   * @param selector Function to run over state
+   * @param keyHandleCollector Optional collector for registering dependencies
+   * @returns Result of selector execution
+   */
+  const runOverState: RunOverState<State, unknown> = (selector, keyHandleCollector?) => {
+    activeKeyHandleCollector = keyHandleCollector;
+
+    return (
+      [
+        runWithRestrictionLifted(() => selector(state)),
+        (activeKeyHandleCollector = undefined),
+      ] as const
+    )[0];
+  };
+
+  const triggerJobStore: Partial<Record<keyof State, KeyHandleRecord>> = {};
+
+  const { addToQueue, runQueue } = createJobQueue();
+
+  /**
+   * Creates a record to manage triggers for a state property. Contains:
+   * - keyHandle: Registers selector triggers and returns cleanup function
+   * - fireKey: Queues all registered triggers when property value changes Uses
+   *   Set to maintain unique triggers per property.
+   */
+  const createKeyHandleRecord = (): KeyHandleRecord => {
+    const triggerSet = new Set<SelectorTrigger>();
+
+    const keyHandle: KeyHandle = (trigger) => {
+      triggerSet.add(trigger);
+
+      return (): void => {
+        triggerSet.delete(trigger);
+      };
+    };
+
+    const fireKey = (): void => {
+      addToQueue(triggerSet);
+    };
+
+    return { keyHandle, fireKey };
+  };
+
+  /**
+   * Updates state with new values and triggers subscriptions.
+   * - Accepts either partial state object or state updater function
+   * - Runs update with authorized access to state properties
+   * - Executes all queued subscription triggers after update
+   *
+   * @param stateChange Partial state object or updater function
+   * @returns Applied state changes
+   */
+  const setState: SetState<State> = (stateChange) =>
+    (
+      [
+        runWithRestrictionLifted(() => {
+          const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
+          Object.assign(state, mergeToState);
+
+          return mergeToState;
+        }),
+
+        runQueue(),
+      ] as const
+    )[0];
+
+  /**
+   * Creates a Proxy handler for the state object with following
+   * responsibilities:
+   * - Tracks dependencies by registering key handles when
+   *   activeKeyHandleCollector is present (set during selector execution to
+   *   collect accessed state properties)
+   * - Triggers subscriptions when state properties change by comparing old/new
+   *   values
+   * - Enforces authorized access through calculationAllowed flag
    */
   const proxyHandler: ProxyHandler<State> = {
-    get: (target, p) => {
+    get: <K extends string | symbol>(target: State, p: K): State[K & keyof State] => {
       restrictCalculation();
 
-      if (triggerJobRoutine) {
-        const triggerStoreRec = (triggerJobStore[p as typeof p & keyof State] ??= new Set());
-        triggerJobRoutine(triggerStoreRec);
+      if (activeKeyHandleCollector) {
+        const { keyHandle } = (triggerJobStore[p as K & keyof State] ??= createKeyHandleRecord());
+
+        activeKeyHandleCollector(keyHandle);
       }
 
-      return target[p as typeof p & keyof State];
+      return target[p as K & keyof State];
     },
 
-    set: (target, p, newValue) => {
+    set: <K extends string | symbol>(
+      target: State,
+      p: K,
+      newValue: State[K & keyof State]
+    ): true => {
       restrictCalculation();
-      const oldValue = target[p as typeof p & keyof State];
-      target[p as typeof p & keyof State] = newValue;
-      const rec = triggerJobStore[p as typeof p & keyof State];
+      const oldValue = target[p as K & keyof State];
+      target[p as K & keyof State] = newValue;
+      const { fireKey } = triggerJobStore[p as K & keyof State] ?? {};
 
-      if (rec && !Object.is(oldValue, newValue)) addToPool(rec);
+      if (fireKey && !Object.is(oldValue, newValue)) fireKey();
 
       return true;
     },
   };
 
   /**
-   * The state object itself constructed through Proxy
+   * The state object wrapped in a Proxy to:
+   * - Track property access for dependency collection
+   * - Trigger subscriptions on property changes
+   * - Enforce authorized access through restriction mechanism
    */
   const state = new Proxy({ ...initState } as State, proxyHandler);
 
-  return { writeState, registerSelectorTrigger };
+  return { runOverState, setState };
 };
 
-type RegisterTriggerJob = (triggerJobSet: Set<() => void>) => void;
+type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
+
+type RunQueue = () => void;
 
 /**
- * The method `registerTriggerJob` is creating to populate the `triggerJobRoutine` from the state
- * image to register a selector trigger.
+ * Creates a queue system to manage selector trigger execution.
+ * - Queue is populated when state properties change via Proxy's set handler
+ * - Maintains unique set of triggers to avoid duplicate executions
+ * - Provides methods to add triggers and process entire queue
+ * - Clears queue after processing all triggers
  */
-export const createRegisterTriggerJob = (selectorTrigger: SelectorTrigger) => {
-  const unregisterPool = new Set<() => void>();
+export const createJobQueue = (): {
+  addToQueue: AddToQueue;
+  runQueue: RunQueue;
+} => {
+  const queue = new Set<SelectorTrigger>();
 
-  /**
-   * The method running all unregister jobs from the unregister pool.
-   */
-  const runUnregister = () => {
-    unregisterPool.forEach((unregJob) => {
-      unregJob();
+  const addToQueue: AddToQueue = (triggerSet) => {
+    triggerSet.forEach((trigger) => {
+      queue.add(trigger);
     });
   };
 
-  /**
-   * The job to add to the set of jobs for a certain record of the state.
-   */
-  const triggerJob = () => {
-    selectorTrigger() || runUnregister();
-  };
-
-  /**
-   * The method receives a set of jobs that gets run when the corresponding state record was
-   * triggered. It adds a trigger job to that set and the unregister job to the unregister pool.
-   */
-  const registerTriggerJob = (triggerJobSet: Set<() => void>) => {
-    triggerJobSet.add(triggerJob);
-
-    unregisterPool.add(() => {
-      triggerJobSet.delete(triggerJob);
-    });
-  };
-
-  return registerTriggerJob;
-};
-
-/**
- * Manage the pool of jobs related to selector triggers. It is populated by the `set` method of the
- * Proxy wrapping the state object to be ready to run.
- */
-export const createJobPool = () => {
-  const pool = new Set<Set<() => void>>();
-  let haveAlreadyBeenRun = new WeakSet<() => void>();
-
-  const addToPool = (jobs: Set<() => void>) => {
-    pool.add(jobs);
-  };
-
-  const runPool = () => {
-    pool.forEach((chunk) => {
-      chunk.forEach((job) => {
-        if (haveAlreadyBeenRun.has(job)) return;
-
-        job();
-        haveAlreadyBeenRun.add(job);
-      });
+  const runQueue: RunQueue = () => {
+    queue.forEach((trigger) => {
+      trigger();
     });
 
-    pool.clear();
-    haveAlreadyBeenRun = new WeakSet();
+    queue.clear();
   };
 
-  return { addToPool, runPool };
+  return { addToQueue, runQueue };
 };

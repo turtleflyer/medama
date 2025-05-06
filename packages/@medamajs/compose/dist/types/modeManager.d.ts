@@ -1,21 +1,24 @@
+type RunWithReadModeOn = (job: () => void) => void;
 type ReadWorkModeMethods = {
     getReadWorkState: () => boolean;
-    startReading: () => void;
-    finishReading: () => void;
+    runWithReadModeOn: RunWithReadModeOn;
     setSubscriptionMeansRequested: () => void;
     getRequestSubscriptionMeansState: () => boolean;
     resetReadWorkMode: () => void;
 };
 export declare const createReadWorkModeManager: () => ReadWorkModeMethods;
+export type DeferOrRun = (job: () => void) => void;
+type Reset = () => void;
 type ConditionalDeferrerMethods = {
-    deferOrRun: (job: () => void) => void;
-    reset: () => void;
+    deferOrRun: DeferOrRun;
+    reset: Reset;
 };
+type CreateConditionalDeferrer = (deferJob: (job: () => void) => void, resolveDeferred: () => void) => ConditionalDeferrerMethods;
 type UpdateWorkModeMethods = {
     getUpdateWorkState: () => boolean;
     startUpdating: () => void;
     signalDeferredJobsToResolve: () => void;
-    createConditionalDeferrer: (deferJob: (job: () => void) => void, resolveDeferred: () => void) => ConditionalDeferrerMethods;
+    createConditionalDeferrer: CreateConditionalDeferrer;
     resetUpdateWorkMode: () => void;
 };
 export declare const createUpdateWorkModeManager: () => UpdateWorkModeMethods;

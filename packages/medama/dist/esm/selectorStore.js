@@ -1,8 +1,8 @@
-export const createSelectorStore = (registerSelectorTrigger) => {
+export const createSelectorStore = (runOverState) => {
     const selectorSubscriptionStore = new WeakMap();
     const getSelectorRecord = (selector) => {
         var _a;
-        const selectorRecord = (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0 ? _a : createSelectorRecord(selector, registerSelectorTrigger);
+        const selectorRecord = (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0 ? _a : createSelectorRecord(selector, runOverState);
         selectorSubscriptionStore.set(selector, selectorRecord);
         return selectorRecord;
     };
@@ -11,18 +11,78 @@ export const createSelectorStore = (registerSelectorTrigger) => {
         return getValue();
     };
     const subscribeToStateInSelectorStore = (selector, subscription) => {
-        const { addSubscription, getValue } = getSelectorRecord(selector);
-        const possibleSubscriptionJob = subscription(getValue());
-        return addSubscription(possibleSubscriptionJob !== null && possibleSubscriptionJob !== void 0 ? possibleSubscriptionJob : subscription);
+        let currentSelector = selector;
+        let unsubscribeHandle = null;
+        let currentRevealedSubscriptionJob;
+        const evaluateAndSubscribe = (subscriptionToReveal) => {
+            const { addSubscription, getValue } = getSelectorRecord(currentSelector);
+            const possibleSubscriptionJob = subscriptionToReveal(getValue());
+            currentRevealedSubscriptionJob =
+                typeof possibleSubscriptionJob === 'function'
+                    ? possibleSubscriptionJob
+                    : subscriptionToReveal;
+            unsubscribeHandle = addSubscription(currentRevealedSubscriptionJob);
+        };
+        evaluateAndSubscribe(subscription);
+        const unsubscribe = () => {
+            unsubscribeHandle === null || unsubscribeHandle === void 0 ? void 0 : unsubscribeHandle();
+            unsubscribeHandle = null;
+        };
+        const resubscribe = (subscriptionToResubscribe) => {
+            unsubscribe();
+            evaluateAndSubscribe(subscriptionToResubscribe);
+        };
+        const transfer = (selectorToTransferTo) => {
+            unsubscribe();
+            currentSelector = selectorToTransferTo;
+            evaluateAndSubscribe(currentRevealedSubscriptionJob);
+        };
+        return { unsubscribe, resubscribe, transfer };
     };
     return { getSelectorValue, subscribeToStateInSelectorStore };
 };
-export const createSelectorRecord = (selector, registerSelectorTrigger) => {
-    let value;
-    let toRecalculateValue = true;
-    let registered = true;
+export const createSelectorRecord = (selector, runOverState) => {
+    const collectedKeyHandles = new Set();
+    const keyHandleCollector = (keyHandle) => {
+        collectedKeyHandles.add(keyHandle);
+    };
+    const unregisterTriggerHandleCallbacks = new Set();
+    let isRegistered = false;
+    const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {
+        if (isRegistered)
+            return;
+        collectedKeyHandles.forEach((handle) => {
+            const callback = handle(selectorTrigger);
+            isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
+        });
+        isRegistered = true;
+    };
+    const unregisterTrigger = () => {
+        unregisterTriggerHandleCallbacks.forEach((callback) => {
+            callback();
+        });
+    };
+    let memValue;
+    let isToRecalculateValue = false;
+    const runSelectorWithMemoization = () => {
+        if (isToRecalculateValue) {
+            memValue = runOverState(selector);
+            isToRecalculateValue = false;
+        }
+    };
     const jobs = new Set();
-    const calculateValue = () => readState(selector);
+    const selectorTrigger = () => {
+        isToRecalculateValue = true;
+        if (jobs.size === 0) {
+            unregisterTrigger();
+            isRegistered = false;
+            return;
+        }
+        runSelectorWithMemoization();
+        jobs.forEach((job) => {
+            job(memValue);
+        });
+    };
     const addSubscription = (subscriptionJob) => {
         jobs.add(subscriptionJob);
         return () => {
@@ -30,27 +90,12 @@ export const createSelectorRecord = (selector, registerSelectorTrigger) => {
         };
     };
     const getValue = () => {
-        if (!registered) {
-            registerSelectorTrigger(selectorTrigger);
-            registered = true;
-        }
-        toRecalculateValue && (value = calculateValue());
-        toRecalculateValue = false;
-        return value;
+        runSelectorWithMemoization();
+        registerTrigger();
+        return memValue;
     };
-    const selectorTrigger = () => {
-        if (jobs.size === 0) {
-            toRecalculateValue = true;
-            registered = false;
-            return false;
-        }
-        value = calculateValue();
-        jobs.forEach((job) => {
-            job(value);
-        });
-        return true;
-    };
-    const readState = registerSelectorTrigger(selectorTrigger);
+    memValue = runOverState(selector, keyHandleCollector);
+    registerTrigger(true);
     return { addSubscription, getValue };
 };
 //# sourceMappingURL=selectorStore.js.map

@@ -84,8 +84,69 @@ subscribeToState(selector, (value) => {
 // print 'This is the first run with value: foo_record bar_record'
 ```
 
-The subscription process establishes a dependency between the subscription job and the specific
-state records that the selector relies upon.
+### Subscription Methods
+
+Each subscription returns methods to manage its lifecycle:
+
+```ts
+const { unsubscribe, resubscribe, transfer } = subscribeToState(selector, (value) => {
+  console.log(value);
+});
+```
+
+- `unsubscribe`: Removes the subscription and cleans up associated resources
+
+```ts
+unsubscribe(); // Subscription stops receiving updates
+```
+
+- `resubscribe`: Updates the subscription with a new subscription function while maintaining the
+  same selector
+
+```ts
+resubscribe((value) => {
+  console.log('New subscription job:', value);
+});
+```
+
+- `transfer`: Moves the subscription to a new selector while keeping the same subscription job
+
+```ts
+transfer(newSelector); // Same job runs with different selector's result
+```
+
+### Factory Functions and Subscription Methods
+
+When using a factory function pattern for subscriptions, the initialization and subscription jobs
+behave differently with `resubscribe` and `transfer`:
+
+```ts
+const { resubscribe, transfer } = subscribeToState(selector, (value) => {
+  console.log('Init with:', value);
+
+  return (value) => {
+    console.log('Update:', value);
+  }
+});
+
+// Resubscribe acts like a new subscription but keeps the original selector,
+// effectively unsubscribing from previous subscription first
+resubscribe((value) => {
+  console.log('New init with:', value);
+
+  return (value) => {
+    console.log('New update:', value);
+  }
+});
+
+// With transfer, only the subscription part runs with new selector result
+// The init part is never re-executed
+transfer(newSelector); // Runs only 'Update: <new_value>'
+```
+
+The factory function pattern is useful when you need setup logic that runs only once during
+subscription initialization, while `transfer` allows changing what data is observed without
+re-running this setup.
 
 ## Setters
 
