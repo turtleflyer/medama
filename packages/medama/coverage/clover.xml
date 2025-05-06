@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1746426531812" clover="3.2.0">
-  <project timestamp="1746426531812" name="All files">
+<coverage generated="1746510995153" clover="3.2.0">
+  <project timestamp="1746510995153" name="All files">
     <metrics statements="2568" coveredstatements="2568" conditionals="314" coveredconditionals="314" methods="53" coveredmethods="53" elements="2935" coveredelements="2935" complexity="0" loc="2568" ncloc="2568" packages="2" files="5" classes="5"/>
     <package name="src">
       <metrics statements="661" coveredstatements="661" conditionals="75" coveredconditionals="75" methods="36" coveredmethods="36"/>
-      <file name="index.ts" path="D:\projects\medama-work\packages\medama\src\index.ts">
+      <file name="index.ts" path="D:\projects\medama\packages\medama\src\index.ts">
         <metrics statements="2" coveredstatements="2" conditionals="1" coveredconditionals="1" methods="1" coveredmethods="1"/>
         <line num="1" count="2" type="cond" truecount="1" falsecount="0"/>
         <line num="2" count="2" type="stmt"/>
       </file>
-      <file name="medama.ts" path="D:\projects\medama-work\packages\medama\src\medama.ts">
+      <file name="medama.ts" path="D:\projects\medama\packages\medama\src\medama.ts">
         <metrics statements="109" coveredstatements="109" conditionals="13" coveredconditionals="13" methods="6" coveredmethods="6"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -121,7 +121,7 @@
         <line num="108" count="702" type="stmt"/>
         <line num="109" count="702" type="stmt"/>
       </file>
-      <file name="selectorStore.ts" path="D:\projects\medama-work\packages\medama\src\selectorStore.ts">
+      <file name="selectorStore.ts" path="D:\projects\medama\packages\medama\src\selectorStore.ts">
         <metrics statements="298" coveredstatements="298" conditionals="32" coveredconditionals="32" methods="16" coveredmethods="16"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -422,7 +422,7 @@
         <line num="297" count="1301" type="stmt"/>
         <line num="298" count="1301" type="stmt"/>
       </file>
-      <file name="state.ts" path="D:\projects\medama-work\packages\medama\src\state.ts">
+      <file name="state.ts" path="D:\projects\medama\packages\medama\src\state.ts">
         <metrics statements="252" coveredstatements="252" conditionals="29" coveredconditionals="29" methods="13" coveredmethods="13"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -680,7 +680,7 @@
     </package>
     <package name="src.__tests__">
       <metrics statements="1907" coveredstatements="1907" conditionals="239" coveredconditionals="239" methods="17" coveredmethods="17"/>
-      <file name="medama.testcases.ts" path="D:\projects\medama-work\packages\medama\src\__tests__\medama.testcases.ts">
+      <file name="medama.testcases.ts" path="D:\projects\medama\packages\medama\src\__tests__\medama.testcases.ts">
         <metrics statements="1907" coveredstatements="1907" conditionals="239" coveredconditionals="239" methods="17" coveredmethods="17"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>

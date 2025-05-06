@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1746426555005" clover="3.2.0">
-  <project timestamp="1746426555005" name="All files">
+<coverage generated="1746511016919" clover="3.2.0">
+  <project timestamp="1746511016919" name="All files">
     <metrics statements="6890" coveredstatements="6890" conditionals="476" coveredconditionals="472" methods="82" coveredmethods="79" elements="7448" coveredelements="7441" complexity="0" loc="6890" ncloc="6890" packages="2" files="10" classes="10"/>
     <package name="src">
       <metrics statements="975" coveredstatements="975" conditionals="111" coveredconditionals="108" methods="50" coveredmethods="50"/>
-      <file name="composeMedama.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\composeMedama.ts">
+      <file name="composeMedama.ts" path="D:\projects\medama\packages\@medamajs\compose\src\composeMedama.ts">
         <metrics statements="581" coveredstatements="581" conditionals="72" coveredconditionals="69" methods="25" coveredmethods="25"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -588,13 +588,13 @@
         <line num="580" count="120" type="stmt"/>
         <line num="581" count="2" type="stmt"/>
       </file>
-      <file name="const.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\const.ts">
+      <file name="const.ts" path="D:\projects\medama\packages\@medamajs\compose\src\const.ts">
         <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
         <line num="3" count="2" type="stmt"/>
       </file>
-      <file name="forEachOnOwnNumerableProps.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\forEachOnOwnNumerableProps.ts">
+      <file name="forEachOnOwnNumerableProps.ts" path="D:\projects\medama\packages\@medamajs\compose\src\forEachOnOwnNumerableProps.ts">
         <metrics statements="22" coveredstatements="22" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -619,12 +619,12 @@
         <line num="21" count="10919" type="stmt"/>
         <line num="22" count="2" type="stmt"/>
       </file>
-      <file name="index.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\index.ts">
+      <file name="index.ts" path="D:\projects\medama\packages\@medamajs\compose\src\index.ts">
         <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
       </file>
-      <file name="jobQueue.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\jobQueue.ts">
+      <file name="jobQueue.ts" path="D:\projects\medama\packages\@medamajs\compose\src\jobQueue.ts">
         <metrics statements="56" coveredstatements="56" conditionals="5" coveredconditionals="5" methods="4" coveredmethods="4"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -683,7 +683,7 @@
         <line num="55" count="2567" type="stmt"/>
         <line num="56" count="2567" type="stmt"/>
       </file>
-      <file name="modeManager.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\modeManager.ts">
+      <file name="modeManager.ts" path="D:\projects\medama\packages\@medamajs\compose\src\modeManager.ts">
         <metrics statements="248" coveredstatements="248" conditionals="23" coveredconditionals="23" methods="16" coveredmethods="16"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -934,7 +934,7 @@
         <line num="247" count="3" type="stmt"/>
         <line num="248" count="3" type="stmt"/>
       </file>
-      <file name="traverseThroughPupils.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\traverseThroughPupils.ts">
+      <file name="traverseThroughPupils.ts" path="D:\projects\medama\packages\@medamajs\compose\src\traverseThroughPupils.ts">
         <metrics statements="63" coveredstatements="63" conditionals="9" coveredconditionals="9" methods="4" coveredmethods="4"/>
         <line num="1" count="2" type="stmt"/>
         <line num="2" count="2" type="stmt"/>
@@ -1003,7 +1003,7 @@
     </package>
     <package name="src.__tests__">
       <metrics statements="5915" coveredstatements="5915" conditionals="365" coveredconditionals="364" methods="32" coveredmethods="29"/>
-      <file name="composeMedamaSpecific.testcases.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\__tests__\composeMedamaSpecific.testcases.ts">
+      <file name="composeMedamaSpecific.testcases.ts" path="D:\projects\medama\packages\@medamajs\compose\src\__tests__\composeMedamaSpecific.testcases.ts">
         <metrics statements="1042" coveredstatements="1042" conditionals="54" coveredconditionals="54" methods="6" coveredmethods="6"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>
@@ -2048,7 +2048,7 @@
         <line num="1041" count="2" type="stmt"/>
         <line num="1042" count="2" type="stmt"/>
       </file>
-      <file name="medamaGuaranties.testcases.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\__tests__\medamaGuaranties.testcases.ts">
+      <file name="medamaGuaranties.testcases.ts" path="D:\projects\medama\packages\@medamajs\compose\src\__tests__\medamaGuaranties.testcases.ts">
         <metrics statements="2228" coveredstatements="2228" conditionals="229" coveredconditionals="229" methods="15" coveredmethods="15"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>
@@ -4279,7 +4279,7 @@
         <line num="2227" count="2" type="stmt"/>
         <line num="2228" count="2" type="stmt"/>
       </file>
-      <file name="nestedLayers.testcases.ts" path="D:\projects\medama-work\packages\@medamajs\compose\src\__tests__\nestedLayers.testcases.ts">
+      <file name="nestedLayers.testcases.ts" path="D:\projects\medama\packages\@medamajs\compose\src\__tests__\nestedLayers.testcases.ts">
         <metrics statements="2645" coveredstatements="2645" conditionals="82" coveredconditionals="81" methods="11" coveredmethods="8"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>
