@@ -7,10 +7,10 @@ const jobQueue_1 = require("./jobQueue");
 const modeManager_1 = require("./modeManager");
 const traverseThroughPupils_1 = require("./traverseThroughPupils");
 const { getReadWorkState, runWithReadModeOn, setSubscriptionMeansRequested, getRequestSubscriptionMeansState, resetReadWorkMode, } = (0, modeManager_1.createReadWorkModeManager)();
-const { getUpdateWorkState, startUpdating, signalDeferredJobsToResolve, createConditionalDeferrer, resetUpdateWorkMode, } = (0, modeManager_1.createUpdateWorkModeManager)();
+const { getUpdateWorkState, startUpdating, signalDeferredJobsToResolve, createDeferrer, getSubscribeToLayerWithSelector, resetUpdateWorkMode, } = (0, modeManager_1.createUpdateWorkModeManager)();
 exports.composeMedama = ((layers, initState) => {
     const { addToQueue: addToStateQueue, processQueue: processStateQueue, resetQueue: resetStateQueue, } = (0, jobQueue_1.createJobQueue)();
-    const { deferOrRun: addToStateQueueAndSubscribeOrRun, reset: resetStateQueueSubscription } = createConditionalDeferrer(addToStateQueue, processStateQueue);
+    const { defer: addToStateQueueAndSubscribe, reset: resetStateQueueSubscription } = createDeferrer(addToStateQueue, processStateQueue);
     const initReset = () => {
         resetStateQueue();
         resetReadWorkMode();
@@ -35,13 +35,14 @@ exports.composeMedama = ((layers, initState) => {
             const isInitiator = !getReadWorkState();
             const calculateResultFromLayers = () => (0, traverseThroughPupils_1.traverseThroughPupils)(pupilRecords, processLayer, !isInitiator && getRequestSubscriptionMeansState()
                 ? (combinedLayers) => {
+                    var _a;
                     combinedLayers[const_1._RELAY_SUBSCRIPTION_MEANS] =
-                        getSubscriptionMeans();
+                        (_a = getSubscriptionMeans()) !== null && _a !== void 0 ? _a : [];
                     return compositeSelector(combinedLayers);
                 }
                 : compositeSelector);
             if (isInitiator) {
-                const selectorRecord = createSelectorRecord(calculateResultFromLayers, addToStateQueueAndSubscribeOrRun, getSubscriptionMeans);
+                const selectorRecord = createSelectorRecord(calculateResultFromLayers, addToStateQueueAndSubscribe, getSubscriptionMeans);
                 selectorStore.set(compositeSelector, selectorRecord);
                 setSubscriptionMeansRequested();
                 const { getValue } = selectorRecord;
@@ -137,10 +138,12 @@ exports.composeMedama = ((layers, initState) => {
 });
 const createLayerProcessorWithSubscriptionMeans = () => {
     const subscriptionMeans = [];
-    const processLayer = (key, layerState, subscribeToLayer, selectorIdentity, combinedLayers = Object.defineProperty(Object.create(null), const_1._COMPOSITE_STATE_SIGNATURE, {
+    let neverRun = true;
+    const processLayer = (key, layerState, subscribeToLayer, selectorIdentity, combinedLayers = Object.defineProperty({}, const_1._COMPOSITE_STATE_SIGNATURE, {
         value: true,
     })) => {
         var _a;
+        neverRun = false;
         combinedLayers[key] = layerState;
         if (getRequestSubscriptionMeansState()) {
             if (const_1._RELAY_SUBSCRIPTION_MEANS in layerState) {
@@ -150,12 +153,12 @@ const createLayerProcessorWithSubscriptionMeans = () => {
                 delete layerState[const_1._RELAY_SUBSCRIPTION_MEANS];
             }
             else {
-                subscriptionMeans.push((subscription) => subscribeToLayer(selectorIdentity, subscription).unsubscribe);
+                subscriptionMeans.push({ subscribeToLayer, layerSelector: selectorIdentity });
             }
         }
         return combinedLayers;
     };
-    const getSubscriptionMeans = () => subscriptionMeans;
+    const getSubscriptionMeans = () => neverRun ? undefined : subscriptionMeans;
     return { processLayer, getSubscriptionMeans };
 };
 const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun, getSubscriptionMeans) => {
@@ -185,13 +188,16 @@ const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun,
             job(memValue);
         });
     };
+    let subscribeMethodsCached = undefined;
     const registerTrigger = () => {
+        var _a, _b;
         if (isRegistered)
             return;
-        const determineSubscriptionPoolExecution = () => {
+        const layerTriggerSubscription = () => {
             addToStateQueueAndSubscribeOrRun(immediateTask, selectorTrigger);
         };
-        const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer) => subscribeToLayer(() => determineSubscriptionPoolExecution));
+        subscribeMethodsCached !== null && subscribeMethodsCached !== void 0 ? subscribeMethodsCached : (subscribeMethodsCached = (_a = getSubscriptionMeans()) === null || _a === void 0 ? void 0 : _a.map(({ subscribeToLayer, layerSelector }) => getSubscribeToLayerWithSelector(subscribeToLayer, layerSelector)));
+        const unsubscribeChunks = (_b = subscribeMethodsCached === null || subscribeMethodsCached === void 0 ? void 0 : subscribeMethodsCached.map((subscribeToLayerWithSelector) => subscribeToLayerWithSelector(layerTriggerSubscription))) !== null && _b !== void 0 ? _b : [];
         unsubscribePoolFromLayers = () => {
             if (!isRegistered)
                 return;

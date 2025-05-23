@@ -23,9 +23,10 @@ import { createJobQueue } from './jobQueue';
 import {
   createReadWorkModeManager,
   createUpdateWorkModeManager,
-  type DeferOrRun,
+  type Defer,
+  type SubscribeToLayerWithSelector,
 } from './modeManager';
-import { traverseThroughPupils } from './traverseThroughPupils';
+import { traverseThroughPupils, type ProcessLayer } from './traverseThroughPupils';
 
 /**
  * Initialize read and update mode managers that handle state access
@@ -44,7 +45,8 @@ const {
   getUpdateWorkState,
   startUpdating,
   signalDeferredJobsToResolve,
-  createConditionalDeferrer,
+  createDeferrer,
+  getSubscribeToLayerWithSelector,
   resetUpdateWorkMode,
 } = createUpdateWorkModeManager();
 
@@ -81,8 +83,10 @@ export const composeMedama = (<State extends CStateG>(
     resetQueue: resetStateQueue,
   } = createJobQueue();
 
-  const { deferOrRun: addToStateQueueAndSubscribeOrRun, reset: resetStateQueueSubscription } =
-    createConditionalDeferrer(addToStateQueue, processStateQueue);
+  const { defer: addToStateQueueAndSubscribe, reset: resetStateQueueSubscription } = createDeferrer(
+    addToStateQueue,
+    processStateQueue
+  );
 
   /**
    * Resets all state management components to their default values. Called
@@ -162,7 +166,7 @@ export const composeMedama = (<State extends CStateG>(
           !isInitiator && getRequestSubscriptionMeansState()
             ? (combinedLayers) => {
                 (combinedLayers as SubscriptionMeansInState)[_RELAY_SUBSCRIPTION_MEANS] =
-                  getSubscriptionMeans();
+                  getSubscriptionMeans() ?? [];
 
                 return compositeSelector(combinedLayers);
               }
@@ -177,7 +181,7 @@ export const composeMedama = (<State extends CStateG>(
       if (isInitiator) {
         const selectorRecord = createSelectorRecord(
           calculateResultFromLayers,
-          addToStateQueueAndSubscribeOrRun,
+          addToStateQueueAndSubscribe,
           getSubscriptionMeans
         );
 
@@ -340,17 +344,12 @@ export const composeMedama = (<State extends CStateG>(
   return Object.assign(pupil, { pupil });
 }) as ComposeMedama;
 
-type ProcessLayer<State extends CStateG> = (
-  key: keyof State,
-  layerState: State[keyof State],
-  subscribeToLayer: SubscribeToState<State[keyof State]>,
-  selectorIdentity: (state: State[keyof State]) => void,
-  combinedLayers?: State
-) => State;
+type SubscriptionChunk = {
+  subscribeToLayer: SubscribeToState<{}>;
+  layerSelector: () => void;
+};
 
-type SubscriptionChunk = (subscription: () => () => void) => () => void;
-
-type GetSubscriptionMeans = () => SubscriptionChunk[];
+type GetSubscriptionMeans = () => SubscriptionChunk[] | undefined;
 
 /**
  * Creates methods for handling layer processing and subscription means
@@ -365,7 +364,7 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
    * - On demand, populate combinedLayer with subscription means from root
    *   states or relay combined means from nested states
    */
-  processLayer: ProcessLayer<State>;
+  processLayer: ProcessLayer<State, State>;
 
   /**
    * Function to retrieve all subscription means collected during layer
@@ -375,20 +374,22 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
   getSubscriptionMeans: GetSubscriptionMeans;
 } => {
   const subscriptionMeans: SubscriptionChunk[] = [];
+  let neverRun = true;
 
-  const processLayer = (
-    key: keyof State,
-    layerState: State[keyof State],
-    subscribeToLayer: SubscribeToState<State[keyof State]>,
-    selectorIdentity: (state: State[keyof State]) => void,
+  const processLayer: ProcessLayer<State, State> = (
+    key,
+    layerState,
+    subscribeToLayer,
+    selectorIdentity,
 
-    combinedLayers: State = Object.defineProperty(Object.create(null), _COMPOSITE_STATE_SIGNATURE, {
+    combinedLayers = Object.defineProperty({} as State, _COMPOSITE_STATE_SIGNATURE, {
       // Special key used to distinguish composite states from root states. This
       // allows selectors to handle state objects differently based on their
       // origin
       value: true,
     })
   ): State => {
+    neverRun = false;
     (combinedLayers as State)[key] = layerState;
 
     if (getRequestSubscriptionMeansState()) {
@@ -400,16 +401,15 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
         // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete (layerState as SubscriptionMeansInState)[_RELAY_SUBSCRIPTION_MEANS];
       } else {
-        subscriptionMeans.push(
-          (subscription) => subscribeToLayer(selectorIdentity, subscription).unsubscribe
-        );
+        subscriptionMeans.push({ subscribeToLayer, layerSelector: selectorIdentity as () => void });
       }
     }
 
     return combinedLayers;
   };
 
-  const getSubscriptionMeans = (): SubscriptionChunk[] => subscriptionMeans;
+  const getSubscriptionMeans = (): SubscriptionChunk[] | undefined =>
+    neverRun ? undefined : subscriptionMeans;
 
   return { processLayer, getSubscriptionMeans };
 };
@@ -458,7 +458,7 @@ type SelectorRecord<V> = {
  */
 const createSelectorRecord = <V>(
   calculateResult: () => V,
-  addToStateQueueAndSubscribeOrRun: DeferOrRun,
+  addToStateQueueAndSubscribeOrRun: Defer,
   getSubscriptionMeans: GetSubscriptionMeans
 ): SelectorRecord<V> => {
   /**
@@ -527,6 +527,8 @@ const createSelectorRecord = <V>(
     });
   };
 
+  let subscribeMethodsCached: SubscribeToLayerWithSelector[] | undefined = undefined;
+
   /**
    * Registers selector's subscriptions with nested layers. Creates combined
    * subscription from all layer subscriptions. Prevents duplicate registrations
@@ -535,13 +537,18 @@ const createSelectorRecord = <V>(
   const registerTrigger = (): void => {
     if (isRegistered) return;
 
-    const determineSubscriptionPoolExecution = (): void => {
+    const layerTriggerSubscription = () => {
       addToStateQueueAndSubscribeOrRun(immediateTask, selectorTrigger);
     };
 
-    const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer): (() => void) =>
-      subscribeToLayer((): (() => void) => determineSubscriptionPoolExecution)
+    subscribeMethodsCached ??= getSubscriptionMeans()?.map(({ subscribeToLayer, layerSelector }) =>
+      getSubscribeToLayerWithSelector(subscribeToLayer, layerSelector)
     );
+
+    const unsubscribeChunks =
+      subscribeMethodsCached?.map((subscribeToLayerWithSelector) =>
+        subscribeToLayerWithSelector(layerTriggerSubscription)
+      ) ?? [];
 
     unsubscribePoolFromLayers = (): void => {
       if (!isRegistered) return;

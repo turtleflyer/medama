@@ -1,4 +1,10 @@
-import { createMedama } from 'medama';
+import {
+  createMedama,
+  selectStateEntriesChanged,
+  type Selector,
+  type SubscribeToState,
+  type UnsubscribeFromState,
+} from 'medama';
 
 /**
  * Function to execute job with read mode enabled. Sets read work state to true
@@ -91,18 +97,21 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods => {
   };
 };
 
-export type DeferOrRun = (runImmediately: () => void, job: () => void) => void;
+/**
+ * Defers job and subscribes to resolution signal (if not already subscribed).
+ *
+ * @param runImmediately Function to execute job immediately if conditions allow
+ * @param job Function representing the job to be deferred
+ */
+export type Defer = (runImmediately: () => void, job: () => void) => void;
 
 type Reset = () => void;
 
-type ConditionalDeferrerMethods = {
+type DeferrerMethods = {
   /**
-   * Either runs job immediately or defers it based on update work state:
-   * - If not in update mode: runs job immediately
-   * - If in update mode: defers job and subscribes to resolution signal (if not
-   *   already subscribed)
+   * Defers job and subscribes to resolution signal (if not already subscribed)
    */
-  deferOrRun: DeferOrRun;
+  defer: Defer;
 
   /**
    * Resets subscription state to false. Used during initialization and error
@@ -111,10 +120,25 @@ type ConditionalDeferrerMethods = {
   reset: Reset;
 };
 
-type CreateConditionalDeferrer = (
+type CreateDeferrer = (
   deferJob: (job: () => void) => void,
   resolveDeferred: () => void
-) => ConditionalDeferrerMethods;
+) => DeferrerMethods;
+
+export type SubscribeToLayerWithSelector = (subscription: () => void) => UnsubscribeFromState;
+
+/**
+ * Returns a function that subscribes to a layer's state changes with a selector,
+ * ensuring signal management for deferred job resolution. Handles subscription record caching.
+ *
+ * @param subscribeToLayer The layer's subscribe function
+ * @param selector Selector for the layer's state
+ * @returns Function to subscribe with signal management
+ */
+type GetSubscribeToLayerWithSelector = (
+  subscribeToLayer: SubscribeToState<{}>,
+  selector: Selector<{}, void>
+) => SubscribeToLayerWithSelector;
 
 type UpdateWorkModeMethods = {
   /**
@@ -136,14 +160,23 @@ type UpdateWorkModeMethods = {
   signalDeferredJobsToResolve: () => void;
 
   /**
-   * Creates a handler that either runs jobs immediately or defers them based on
-   * current state. Provides subscription mechanism to resolve deferred jobs
-   * when signaled.
+   * Creates a handler that defers jobs. Provides subscription mechanism to
+   * resolve deferred jobs when signaled.
    *
    * @param deferJob Function to add job to deferred queue
    * @param resolveDeferred Function to process deferred queue
    */
-  createConditionalDeferrer: CreateConditionalDeferrer;
+  createDeferrer: CreateDeferrer;
+
+  /**
+   * Returns a function that subscribes to a layer's state changes with a selector,
+   * ensuring signal management for deferred job resolution. Handles subscription record caching.
+   *
+   * @param subscribeToLayer The layer's subscribe function
+   * @param selector Selector for the layer's state
+   * @returns Function to subscribe with signal management
+   */
+  getSubscribeToLayerWithSelector: GetSubscribeToLayerWithSelector;
 
   /**
    * Resets signal state and update work state to false. Used during
@@ -157,19 +190,49 @@ type SignalToResolveDeferredJobsState = {
 };
 
 /**
- * Creates a manager to control update work mode and deferred job handling.
- * Manages update state and provides mechanisms for:
- * - Controlling when jobs should be deferred vs executed immediately
- * - Signaling when deferred jobs should be processed
- * - Creating conditional deferrer instances that handle job execution timing
+ * Subscribes to both the layer's state changes and the signal for resolving deferred jobs.
+ * Ensures that job counting and signal subscription are managed correctly for the layer.
  *
- * Uses medama state to manage signaling system for deferred job resolution.
+ * @param selector Selector for the layer's state
+ * @param subscription Callback to execute when the layer's state changes
+ * @returns Unsubscribe function for the subscription
+ */
+type SubscribeAndManageDeferring = (
+  selector: Selector<{}, void>,
+  subscription: () => void
+) => UnsubscribeFromState;
+
+type LayerSubscriptionRecord = {
+  /**
+   * Subscribes to both the layer's state changes and the signal for resolving deferred jobs.
+   * Ensures that job counting and signal subscription are managed correctly for the layer.
+   *
+   * @param selector Selector for the layer's state
+   * @param subscription Callback to execute when the layer's state changes
+   * @returns Unsubscribe function for the subscription
+   */
+  subscribeAndManageDeferring: SubscribeAndManageDeferring;
+};
+
+/**
+ * Creates a manager to control update work mode and deferred job handling. This
+ * manager is responsible for:
+ * - Tracking whether an update process is currently active (update work state)
+ * - Deferring jobs when updates are in progress, and executing them when signaled
+ * - Providing a mechanism to signal when deferred jobs should be resolved
+ * - Creating deferrer instances that handle job execution timing based on a signal
+ * - Managing subscriptions for state changes and deferred job resolution using medama state
  *
- * @returns Object containing methods to manage update work mode and job
- * deferral
+ * @returns Object containing methods to manage update work mode, job deferral, and signal-based resolution
  */
 export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
   let updateWorkState = false;
+
+  /**
+   * Stores a mapping from a subscribeToLayer function to its layer subscription record.
+   * Used to manage subscriptions for each layer independently.
+   */
+  const layerSubscriptionStore = new WeakMap<SubscribeToState<{}>, LayerSubscriptionRecord>();
 
   const getUpdateWorkState = (): boolean => updateWorkState;
 
@@ -201,22 +264,12 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
     );
   };
 
-  const createConditionalDeferrer = (
-    deferJob: (job: () => void) => void,
-    resolveDeferred: () => void
-  ): ConditionalDeferrerMethods => {
+  const createDeferrer: CreateDeferrer = (deferJob, resolveDeferred) => {
     let subscribed = false;
 
     return {
-      deferOrRun: (runImmediately, job): void => {
+      defer: (runImmediately, job) => {
         runImmediately();
-
-        if (updateWorkState === false) {
-          job();
-
-          return;
-        }
-
         deferJob(job);
 
         if (subscribed) return;
@@ -229,10 +282,59 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
         subscribed = true;
       },
 
-      reset: (): void => {
+      reset: () => {
         subscribed = false;
       },
     };
+  };
+
+  /**
+   * Creates a subscription record for managing signal-based job resolution for a given layer.
+   * Handles subscription lifecycle and job counting for deferred job signaling.
+   */
+  const createLayerSubscriptionRecord = (
+    subscribeToLayer: SubscribeToState<{}>
+  ): LayerSubscriptionRecord => {
+    let countJobs = 0;
+    let unsubscribeSignalTrigger: (() => void) | undefined;
+
+    const signalTrigger = () => () => {
+      updateWorkState || setSignalState({ signal: {} });
+    };
+
+    const subscribeAndManageDeferring: SubscribeAndManageDeferring = (selector, subscription) => {
+      countJobs++ === 0 &&
+        (unsubscribeSignalTrigger = subscribeToLayer(
+          selectStateEntriesChanged,
+          signalTrigger
+        ).unsubscribe);
+
+      const { unsubscribe } = subscribeToLayer(selector, () => subscription);
+
+      return () => {
+        --countJobs === 0 && unsubscribeSignalTrigger?.();
+        unsubscribe();
+      };
+    };
+
+    return {
+      subscribeAndManageDeferring,
+    };
+  };
+
+  const getSubscribeToLayerWithSelector: GetSubscribeToLayerWithSelector = (
+    subscribeToLayer,
+    selector
+  ) => {
+    const signalSubscriptionRecord =
+      layerSubscriptionStore.get(subscribeToLayer) ??
+      createLayerSubscriptionRecord(subscribeToLayer);
+
+    layerSubscriptionStore.set(subscribeToLayer, signalSubscriptionRecord);
+    const { subscribeAndManageDeferring } = signalSubscriptionRecord;
+    signalSubscriptionRecord.subscribeAndManageDeferring;
+
+    return (subscription: () => void) => subscribeAndManageDeferring(selector, subscription);
   };
 
   const resetUpdateWorkMode = (): void => {
@@ -244,7 +346,8 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
     getUpdateWorkState,
     startUpdating,
     signalDeferredJobsToResolve,
-    createConditionalDeferrer,
+    createDeferrer,
+    getSubscribeToLayerWithSelector,
     resetUpdateWorkMode,
   };
 };

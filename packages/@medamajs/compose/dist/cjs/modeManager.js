@@ -31,6 +31,7 @@ const createReadWorkModeManager = () => {
 exports.createReadWorkModeManager = createReadWorkModeManager;
 const createUpdateWorkModeManager = () => {
     let updateWorkState = false;
+    const layerSubscriptionStore = new WeakMap();
     const getUpdateWorkState = () => updateWorkState;
     const startUpdating = () => {
         updateWorkState = true;
@@ -47,15 +48,11 @@ const createUpdateWorkModeManager = () => {
             unsubscribe();
         });
     };
-    const createConditionalDeferrer = (deferJob, resolveDeferred) => {
+    const createDeferrer = (deferJob, resolveDeferred) => {
         let subscribed = false;
         return {
-            deferOrRun: (runImmediately, job) => {
+            defer: (runImmediately, job) => {
                 runImmediately();
-                if (updateWorkState === false) {
-                    job();
-                    return;
-                }
                 deferJob(job);
                 if (subscribed)
                     return;
@@ -70,6 +67,33 @@ const createUpdateWorkModeManager = () => {
             },
         };
     };
+    const createLayerSubscriptionRecord = (subscribeToLayer) => {
+        let countJobs = 0;
+        let unsubscribeSignalTrigger;
+        const signalTrigger = () => () => {
+            updateWorkState || setSignalState({ signal: {} });
+        };
+        const subscribeAndManageDeferring = (selector, subscription) => {
+            countJobs++ === 0 &&
+                (unsubscribeSignalTrigger = subscribeToLayer(medama_1.selectStateEntriesChanged, signalTrigger).unsubscribe);
+            const { unsubscribe } = subscribeToLayer(selector, () => subscription);
+            return () => {
+                --countJobs === 0 && (unsubscribeSignalTrigger === null || unsubscribeSignalTrigger === void 0 ? void 0 : unsubscribeSignalTrigger());
+                unsubscribe();
+            };
+        };
+        return {
+            subscribeAndManageDeferring,
+        };
+    };
+    const getSubscribeToLayerWithSelector = (subscribeToLayer, selector) => {
+        var _a;
+        const signalSubscriptionRecord = (_a = layerSubscriptionStore.get(subscribeToLayer)) !== null && _a !== void 0 ? _a : createLayerSubscriptionRecord(subscribeToLayer);
+        layerSubscriptionStore.set(subscribeToLayer, signalSubscriptionRecord);
+        const { subscribeAndManageDeferring } = signalSubscriptionRecord;
+        signalSubscriptionRecord.subscribeAndManageDeferring;
+        return (subscription) => subscribeAndManageDeferring(selector, subscription);
+    };
     const resetUpdateWorkMode = () => {
         resetSignalState();
         updateWorkState = false;
@@ -78,7 +102,8 @@ const createUpdateWorkModeManager = () => {
         getUpdateWorkState,
         startUpdating,
         signalDeferredJobsToResolve,
-        createConditionalDeferrer,
+        createDeferrer,
+        getSubscribeToLayerWithSelector,
         resetUpdateWorkMode,
     };
 };

@@ -1,6 +1,14 @@
 import type { Pupil, SubscribeToState } from 'medama';
 import type { CStateG } from './auxiliaryTypes';
 
+export type ProcessLayer<State extends CStateG, Acc> = (
+  key: keyof State,
+  layerState: State[keyof State],
+  subscribeToState: SubscribeToState<State[keyof State]>,
+  selectorIdentity: (state: State[keyof State]) => void,
+  acc?: Acc
+) => Acc;
+
 /**
  * Higher-order function similar to Array.reduce but specialized for traversing
  * nested states. Key features:
@@ -18,16 +26,10 @@ import type { CStateG } from './auxiliaryTypes';
  * @param final Function to transform accumulated result into final value
  * @returns Result of applying final function to accumulated value
  */
-export const traverseThroughPupils = <CS extends CStateG, Acc, R>(
-  pupilRecords: [keyof CS, Pupil<CS[keyof CS]>][],
+export const traverseThroughPupils = <State extends CStateG, Acc, R>(
+  pupilRecords: [keyof State, Pupil<State[keyof State]>][],
 
-  processLayer: (
-    key: keyof CS,
-    layerState: CS[keyof CS],
-    subscribeToState: SubscribeToState<CS[keyof CS]>,
-    selectorIdentity: (state: CS[keyof CS]) => void,
-    acc?: Acc
-  ) => Acc,
+  processLayer: ProcessLayer<State, Acc>,
 
   final: (acc: Acc) => R
 ): R => {
@@ -43,8 +45,8 @@ export const traverseThroughPupils = <CS extends CStateG, Acc, R>(
     return readState(nextStep);
   };
 
-  const createStep = (key: keyof CS, { subscribeToState }: Pupil<CS[keyof CS]>) => {
-    const stepEmitted = (state: CS[keyof CS]): R => {
+  const createStep = (key: keyof State, { subscribeToState }: Pupil<State[keyof State]>) => {
+    const stepEmitted = (state: State[keyof State]): R => {
       if (selectorToSeal) return undefined as R;
 
       acc = processLayer(key, state, subscribeToState, stepEmitted, acc);
