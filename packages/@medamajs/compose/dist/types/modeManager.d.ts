@@ -7,7 +7,7 @@ type ReadWorkModeMethods = {
     resetReadWorkMode: () => void;
 };
 export declare const createReadWorkModeManager: () => ReadWorkModeMethods;
-export type DeferOrRun = (job: () => void) => void;
+export type DeferOrRun = (runImmediately: () => void, job: () => void) => void;
 type Reset = () => void;
 type ConditionalDeferrerMethods = {
     deferOrRun: DeferOrRun;

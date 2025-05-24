@@ -91,7 +91,7 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods => {
   };
 };
 
-export type DeferOrRun = (job: () => void) => void;
+export type DeferOrRun = (runImmediately: () => void, job: () => void) => void;
 
 type Reset = () => void;
 
@@ -208,7 +208,9 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
     let subscribed = false;
 
     return {
-      deferOrRun: (job): void => {
+      deferOrRun: (runImmediately, job): void => {
+        runImmediately();
+
         if (updateWorkState === false) {
           job();
 

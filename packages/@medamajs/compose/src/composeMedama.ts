@@ -472,31 +472,6 @@ const createSelectorRecord = <V>(
   let isRegistered = false;
 
   /**
-   * Registers selector's subscriptions with nested layers. Creates combined
-   * subscription from all layer subscriptions. Prevents duplicate registrations
-   * via isRegistered flag.
-   */
-  const registerTrigger = (): void => {
-    if (isRegistered) return;
-
-    const determineSubscriptionPoolExecution = (): void => {
-      addToStateQueueAndSubscribeOrRun(selectorTrigger);
-    };
-
-    const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer): (() => void) =>
-      subscribeToLayer((): (() => void) => determineSubscriptionPoolExecution)
-    );
-
-    unsubscribePoolFromLayers = (): void => {
-      unsubscribeChunks.forEach((unsubscribe): void => {
-        unsubscribe();
-      });
-    };
-
-    isRegistered = true;
-  };
-
-  /**
    * Memoized selector result value
    */
   let memValue: V;
@@ -521,6 +496,15 @@ const createSelectorRecord = <V>(
   };
 
   /**
+   * Marks the selector as needing recalculation.
+   * This is called when a dependency in a nested layer changes, ensuring that
+   * the selector value will be recomputed the next time it is accessed or when a trigger fires.
+   */
+  const immediateTask = () => {
+    isToRecalculateValue = true;
+  };
+
+  /**
    * Collection of subscription jobs that run when selector value changes
    */
   const jobs = new Set<SubscriptionJob<V>>();
@@ -530,11 +514,8 @@ const createSelectorRecord = <V>(
    * subscription notifications. Cleans up when no subscriptions remain.
    */
   const selectorTrigger = (): void => {
-    isToRecalculateValue = true;
-
     if (jobs.size === 0) {
       unsubscribePoolFromLayers();
-      isRegistered = false;
 
       return;
     }
@@ -546,12 +527,33 @@ const createSelectorRecord = <V>(
     });
   };
 
-  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
-    jobs.add(subscriptionJob);
+  /**
+   * Registers selector's subscriptions with nested layers. Creates combined
+   * subscription from all layer subscriptions. Prevents duplicate registrations
+   * via isRegistered flag.
+   */
+  const registerTrigger = (): void => {
+    if (isRegistered) return;
 
-    return () => {
-      jobs.delete(subscriptionJob);
+    const determineSubscriptionPoolExecution = (): void => {
+      addToStateQueueAndSubscribeOrRun(immediateTask, selectorTrigger);
     };
+
+    const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer): (() => void) =>
+      subscribeToLayer((): (() => void) => determineSubscriptionPoolExecution)
+    );
+
+    unsubscribePoolFromLayers = (): void => {
+      if (!isRegistered) return;
+
+      unsubscribeChunks.forEach((unsubscribe): void => {
+        unsubscribe();
+      });
+
+      isRegistered = false;
+    };
+
+    isRegistered = true;
   };
 
   const getValue: GetValue<V> = () => {
@@ -559,6 +561,14 @@ const createSelectorRecord = <V>(
     registerTrigger();
 
     return memValue;
+  };
+
+  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
+    jobs.add(subscriptionJob);
+
+    return () => {
+      jobs.delete(subscriptionJob);
+    };
   };
 
   return { addSubscription, getValue };

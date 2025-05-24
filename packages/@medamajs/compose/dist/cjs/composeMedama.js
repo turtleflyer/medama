@@ -161,20 +161,6 @@ const createLayerProcessorWithSubscriptionMeans = () => {
 const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun, getSubscriptionMeans) => {
     let unsubscribePoolFromLayers;
     let isRegistered = false;
-    const registerTrigger = () => {
-        if (isRegistered)
-            return;
-        const determineSubscriptionPoolExecution = () => {
-            addToStateQueueAndSubscribeOrRun(selectorTrigger);
-        };
-        const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer) => subscribeToLayer(() => determineSubscriptionPoolExecution));
-        unsubscribePoolFromLayers = () => {
-            unsubscribeChunks.forEach((unsubscribe) => {
-                unsubscribe();
-            });
-        };
-        isRegistered = true;
-    };
     let memValue;
     let isToRecalculateValue = true;
     const runSelectorWithMemoization = () => {
@@ -185,12 +171,13 @@ const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun,
             isToRecalculateValue = false;
         }
     };
+    const immediateTask = () => {
+        isToRecalculateValue = true;
+    };
     const jobs = new Set();
     const selectorTrigger = () => {
-        isToRecalculateValue = true;
         if (jobs.size === 0) {
             unsubscribePoolFromLayers();
-            isRegistered = false;
             return;
         }
         runSelectorWithMemoization();
@@ -198,16 +185,33 @@ const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun,
             job(memValue);
         });
     };
-    const addSubscription = (subscriptionJob) => {
-        jobs.add(subscriptionJob);
-        return () => {
-            jobs.delete(subscriptionJob);
+    const registerTrigger = () => {
+        if (isRegistered)
+            return;
+        const determineSubscriptionPoolExecution = () => {
+            addToStateQueueAndSubscribeOrRun(immediateTask, selectorTrigger);
         };
+        const unsubscribeChunks = getSubscriptionMeans().map((subscribeToLayer) => subscribeToLayer(() => determineSubscriptionPoolExecution));
+        unsubscribePoolFromLayers = () => {
+            if (!isRegistered)
+                return;
+            unsubscribeChunks.forEach((unsubscribe) => {
+                unsubscribe();
+            });
+            isRegistered = false;
+        };
+        isRegistered = true;
     };
     const getValue = () => {
         runSelectorWithMemoization();
         registerTrigger();
         return memValue;
+    };
+    const addSubscription = (subscriptionJob) => {
+        jobs.add(subscriptionJob);
+        return () => {
+            jobs.delete(subscriptionJob);
+        };
     };
     return { addSubscription, getValue };
 };

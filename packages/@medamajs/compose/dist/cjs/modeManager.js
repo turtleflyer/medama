@@ -50,7 +50,8 @@ const createUpdateWorkModeManager = () => {
     const createConditionalDeferrer = (deferJob, resolveDeferred) => {
         let subscribed = false;
         return {
-            deferOrRun: (job) => {
+            deferOrRun: (runImmediately, job) => {
+                runImmediately();
                 if (updateWorkState === false) {
                     job();
                     return;
