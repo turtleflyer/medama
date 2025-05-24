@@ -46,25 +46,19 @@ const createSelectorStore = (runOverState) => {
 };
 exports.createSelectorStore = createSelectorStore;
 const createSelectorRecord = (selector, runOverState) => {
-    const collectedKeyHandles = new Set();
-    const keyHandleCollector = (keyHandle) => {
-        collectedKeyHandles.add(keyHandle);
-    };
     const unregisterTriggerHandleCallbacks = new Set();
     let isRegistered = false;
-    const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {
-        if (isRegistered)
-            return;
-        collectedKeyHandles.forEach((handle) => {
-            const callback = handle(selectorTrigger);
-            isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
-        });
-        isRegistered = true;
-    };
     const unregisterTrigger = () => {
+        if (!isRegistered)
+            return;
         unregisterTriggerHandleCallbacks.forEach((callback) => {
             callback();
         });
+        isRegistered = false;
+    };
+    const collectedKeyHandles = new Set();
+    const keyHandleCollector = (keyHandle) => {
+        collectedKeyHandles.add(keyHandle);
     };
     let memValue;
     let isToRecalculateValue = false;
@@ -74,18 +68,28 @@ const createSelectorRecord = (selector, runOverState) => {
             isToRecalculateValue = false;
         }
     };
+    const immediateTask = () => {
+        isToRecalculateValue = true;
+    };
     const jobs = new Set();
     const selectorTrigger = () => {
-        isToRecalculateValue = true;
         if (jobs.size === 0) {
             unregisterTrigger();
-            isRegistered = false;
             return;
         }
         runSelectorWithMemoization();
         jobs.forEach((job) => {
             job(memValue);
         });
+    };
+    const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {
+        if (isRegistered)
+            return;
+        collectedKeyHandles.forEach((handle) => {
+            const callback = handle(immediateTask, selectorTrigger);
+            isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
+        });
+        isRegistered = true;
     };
     const addSubscription = (subscriptionJob) => {
         jobs.add(subscriptionJob);

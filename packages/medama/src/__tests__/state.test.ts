@@ -77,6 +77,7 @@ describe('testing state part', () => {
       memKeyHandle.push(keyHandle);
     });
 
+    const immediateTask = jest.fn(() => {});
     const selectorTrigger = jest.fn(() => {});
 
     let { runOverState, setState } = createStateImage<{
@@ -109,25 +110,33 @@ describe('testing state part', () => {
     expect(runOverState((state) => state.a)).toBe(44);
     expect(keyHandleCollector).toHaveBeenCalledTimes(0);
 
-    const unregisterCallbacks1 = memKeyHandle.map((handle) => handle(selectorTrigger));
+    const unregisterCallbacks1 = memKeyHandle.map((handle) =>
+      handle(immediateTask, selectorTrigger)
+    );
     expect(unregisterCallbacks1).toHaveLength(1);
 
     setState({ a: 15 });
     expect(runOverState((state) => state.a)).toBe(15);
+    expect(immediateTask).toHaveBeenCalledTimes(1);
     expect(selectorTrigger).toHaveBeenCalledTimes(1);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     setState({ 2: 'no', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 15, 2: 'no', [symbKey]: false });
+    expect(immediateTask).toHaveBeenCalledTimes(0);
     expect(selectorTrigger).toHaveBeenCalledTimes(0);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     setState({ a: 17, 2: 'go', [symbKey]: true });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 17, 2: 'go', [symbKey]: true });
+    expect(immediateTask).toHaveBeenCalledTimes(1);
     expect(selectorTrigger).toHaveBeenCalledTimes(1);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     unregisterCallbacks1.forEach((callback) => {
@@ -135,6 +144,7 @@ describe('testing state part', () => {
     });
     setState({ a: 200 });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 200, 2: 'go', [symbKey]: true });
+    expect(immediateTask).toHaveBeenCalledTimes(0);
     expect(selectorTrigger).toHaveBeenCalledTimes(0);
 
     memKeyHandle = [];
@@ -151,31 +161,44 @@ describe('testing state part', () => {
     expect(runOverState((state) => state[2])).toBe('see');
     expect(keyHandleCollector).toHaveBeenCalledTimes(0);
 
-    const unregisterCallbacks2 = memKeyHandle.map((handle) => handle(selectorTrigger));
+    const unregisterCallbacks2 = memKeyHandle.map((handle) =>
+      handle(immediateTask, selectorTrigger)
+    );
     expect(unregisterCallbacks2).toHaveLength(2);
+
+    immediateTask.mock.calls = [];
+    selectorTrigger.mock.calls = [];
 
     setState({ [symbKey]: false });
     expect(runOverState((state) => state[symbKey])).toBe(false);
+    expect(immediateTask).toHaveBeenCalledTimes(1);
     expect(selectorTrigger).toHaveBeenCalledTimes(1);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     setState({ a: 100, [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 100, 2: 'see', [symbKey]: false });
+    expect(immediateTask).toHaveBeenCalledTimes(0);
     expect(selectorTrigger).toHaveBeenCalledTimes(0);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     setState({ a: 700, 2: 'win', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 700, 2: 'win', [symbKey]: false });
+    expect(immediateTask).toHaveBeenCalledTimes(1);
     expect(selectorTrigger).toHaveBeenCalledTimes(1);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     setState({ a: -1, 2: 'loose', [symbKey]: true });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: -1, 2: 'loose', [symbKey]: true });
+    expect(immediateTask).toHaveBeenCalledTimes(2);
     expect(selectorTrigger).toHaveBeenCalledTimes(1);
 
+    immediateTask.mock.calls = [];
     selectorTrigger.mock.calls = [];
 
     unregisterCallbacks2.forEach((callback) => {
@@ -183,6 +206,7 @@ describe('testing state part', () => {
     });
     setState({ a: 5, 2: 'can', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 5, 2: 'can', [symbKey]: false });
+    expect(immediateTask).toHaveBeenCalledTimes(0);
     expect(selectorTrigger).toHaveBeenCalledTimes(0);
 
     let memSate: {};

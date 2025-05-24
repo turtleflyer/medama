@@ -1903,5 +1903,107 @@ export const medamaTest = (createMedama: CreateMedama) => {
       const medama = createMedama({ a: 1, b: 10 });
       expect(medama).toBe(medama.pupil);
     });
+
+    test('readState inside subscription job returns updated selector values', () => {
+      type State = { a: number; b: number };
+
+      const { subscribeToState, setState, readState } = createMedama({ a: 1, b: 20 });
+
+      const selector1 = jest.fn(({ a, b }: State) => ({ a, b }));
+
+      expect(readState(selector1)).toEqual({ a: 1, b: 20 });
+      expect(selector1).toHaveBeenCalledTimes(1);
+
+      let testValue1!: object;
+
+      const subscription1 = jest.fn((v: State) => {
+        testValue1 = v;
+      });
+
+      selector1.mock.calls = [];
+
+      subscribeToState(selector1, subscription1);
+      expect(testValue1).toEqual({ a: 1, b: 20 });
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+
+      const selector2 = jest.fn(({ a }: State) => a);
+
+      selector1.mock.calls = [];
+      subscription1.mock.calls = [];
+
+      expect(readState(selector2)).toBe(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+
+      let testValue2!: number;
+
+      const subscription2 = jest.fn((v: number) => {
+        testValue2 = v;
+      });
+
+      selector1.mock.calls = [];
+      selector2.mock.calls = [];
+      subscription1.mock.calls = [];
+
+      subscribeToState(selector2, subscription2);
+      expect(testValue2).toBe(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+
+      let testValue3!: number;
+
+      const subscription3 = jest.fn(() => {
+        testValue3 = readState(selector2);
+      });
+
+      selector1.mock.calls = [];
+      selector2.mock.calls = [];
+      subscription1.mock.calls = [];
+      subscription2.mock.calls = [];
+
+      subscribeToState(selector1, subscription3);
+      expect(testValue3).toBe(1);
+      expect(selector1).toHaveBeenCalledTimes(0);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(0);
+      expect(subscription2).toHaveBeenCalledTimes(0);
+      expect(subscription3).toHaveBeenCalledTimes(1);
+
+      selector1.mock.calls = [];
+      selector2.mock.calls = [];
+      subscription1.mock.calls = [];
+      subscription2.mock.calls = [];
+      subscription3.mock.calls = [];
+
+      setState({ b: 30 });
+      expect(testValue1).toEqual({ a: 1, b: 30 });
+      expect(testValue2).toEqual(1);
+      expect(testValue3).toEqual(1);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(0);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(0);
+      expect(subscription3).toHaveBeenCalledTimes(1);
+
+      selector1.mock.calls = [];
+      selector2.mock.calls = [];
+      subscription1.mock.calls = [];
+      subscription2.mock.calls = [];
+      subscription3.mock.calls = [];
+
+      setState({ a: 4 });
+      expect(testValue1).toEqual({ a: 4, b: 30 });
+      expect(testValue2).toEqual(4);
+      expect(testValue3).toEqual(4);
+      expect(selector1).toHaveBeenCalledTimes(1);
+      expect(selector2).toHaveBeenCalledTimes(1);
+      expect(subscription1).toHaveBeenCalledTimes(1);
+      expect(subscription2).toHaveBeenCalledTimes(1);
+      expect(subscription3).toHaveBeenCalledTimes(1);
+    });
   });
 };

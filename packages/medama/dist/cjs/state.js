@@ -22,14 +22,20 @@ const createStateImage = (initState) => {
     const triggerJobStore = {};
     const { addToQueue, runQueue } = (0, exports.createJobQueue)();
     const createKeyHandleRecord = () => {
+        const immediateTaskSet = new Set();
         const triggerSet = new Set();
-        const keyHandle = (trigger) => {
+        const keyHandle = (runImmediately, trigger) => {
+            immediateTaskSet.add(runImmediately);
             triggerSet.add(trigger);
             return () => {
+                immediateTaskSet.delete(runImmediately);
                 triggerSet.delete(trigger);
             };
         };
         const fireKey = () => {
+            immediateTaskSet.forEach((task) => {
+                task();
+            });
             addToQueue(triggerSet);
         };
         return { keyHandle, fireKey };

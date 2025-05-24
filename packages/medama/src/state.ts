@@ -1,20 +1,23 @@
 import type { ReadState, Selector, SetState } from './medama.types';
 
-export type SelectorTrigger = () => void;
-
 type UnregisterTriggerFromKeyHandle = () => void;
 
 /**
- * Function to register a selector's trigger with a state property. When
- * property value changes, registered trigger is called. Returns cleanup
- * function to unregister trigger.
+ * Function to register a selector's trigger with a state property.
+ *
+ * @param runImmediately Callback to mark the selector as needing recalculation when the property changes.
+ * @param trigger Callback to execute when the property changes (typically triggers selector re-evaluation and subscriptions).
+ * @returns Cleanup function to unregister both callbacks from the property.
  */
-export type KeyHandle = (trigger: SelectorTrigger) => UnregisterTriggerFromKeyHandle;
+export type KeyHandle = (
+  runImmediately: () => void,
+  trigger: () => void
+) => UnregisterTriggerFromKeyHandle;
 
 export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
 
 export type RegisterSelectorTrigger<State extends object> = (
-  selectorTrigger: SelectorTrigger
+  selectorTrigger: () => void
 ) => ReadState<State>;
 
 type KeyHandleRecord = {
@@ -121,23 +124,35 @@ export const createStateImage = <State extends object>(
   const { addToQueue, runQueue } = createJobQueue();
 
   /**
-   * Creates a record to manage triggers for a state property. Contains:
-   * - keyHandle: Registers selector triggers and returns cleanup function
-   * - fireKey: Queues all registered triggers when property value changes Uses
-   *   Set to maintain unique triggers per property.
+   * Creates a record to manage triggers for a state property.
+   * - keyHandle: Registers callbacks for when the property changes. These include:
+   *   - runImmediately: Marks dependent selectors as needing recalculation.
+   *   - trigger: Notifies selectors/subscribers of the property change.
+   *   Returns a cleanup function to unregister both callbacks.
+   * - fireKey: Invoked when the property value changes. It:
+   *   - Calls all runImmediately callbacks to mark selectors as stale.
+   *   - Queues all trigger callbacks for batched execution (avoiding duplicate runs).
+   *   This ensures efficient and correct propagation of state changes to all dependents.
    */
   const createKeyHandleRecord = (): KeyHandleRecord => {
-    const triggerSet = new Set<SelectorTrigger>();
+    const immediateTaskSet = new Set<() => void>();
+    const triggerSet = new Set<() => void>();
 
-    const keyHandle: KeyHandle = (trigger) => {
+    const keyHandle: KeyHandle = (runImmediately, trigger) => {
+      immediateTaskSet.add(runImmediately);
       triggerSet.add(trigger);
 
       return (): void => {
+        immediateTaskSet.delete(runImmediately);
         triggerSet.delete(trigger);
       };
     };
 
     const fireKey = (): void => {
+      immediateTaskSet.forEach((task) => {
+        task();
+      });
+
       addToQueue(triggerSet);
     };
 
@@ -217,7 +232,7 @@ export const createStateImage = <State extends object>(
   return { runOverState, setState };
 };
 
-type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
+type AddToQueue = (triggerSet: Set<() => void>) => void;
 
 type RunQueue = () => void;
 
@@ -232,7 +247,7 @@ export const createJobQueue = (): {
   addToQueue: AddToQueue;
   runQueue: RunQueue;
 } => {
-  const queue = new Set<SelectorTrigger>();
+  const queue = new Set<() => void>();
 
   const addToQueue: AddToQueue = (triggerSet) => {
     triggerSet.forEach((trigger) => {

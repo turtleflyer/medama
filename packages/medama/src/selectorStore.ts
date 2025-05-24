@@ -152,6 +152,38 @@ export const createSelectorRecord = <State extends object, V>(
   runOverState: RunOverState<State, V>
 ): SelectorRecord<V> => {
   /**
+   * Stores cleanup functions returned by key handles during initial
+   * registration. Used to remove selector trigger from state property
+   * dependencies when needed. Called during unregistration to clean up all
+   * dependency subscriptions.
+   */
+  const unregisterTriggerHandleCallbacks = new Set<() => void>();
+
+  /**
+   * Indicates if the selector is currently registered.
+   */
+  let isRegistered = false;
+
+  /**
+   * Unregisters the selector's trigger from all its dependency key handles.
+   * - Calls all stored cleanup callbacks to remove the selector's trigger from state property dependencies.
+   * - Ensures this operation only runs if the selector is currently registered.
+   * - Marks the selector as unregistered to prevent duplicate cleanup.
+   *
+   * This is used for automatic cleanup when a selector is no longer needed (e.g., no active subscriptions remain),
+   * helping to avoid memory leaks and unnecessary notifications.
+   */
+  const unregisterTrigger = (): void => {
+    if (!isRegistered) return;
+
+    unregisterTriggerHandleCallbacks.forEach((callback) => {
+      callback();
+    });
+
+    isRegistered = false;
+  };
+
+  /**
    * Stores key handles collected during initial selector execution. Each handle
    * represents a state property dependency. Used to register/unregister
    * selector trigger when these dependencies change. Maintained throughout
@@ -166,44 +198,6 @@ export const createSelectorRecord = <State extends object, V>(
    */
   const keyHandleCollector: KeyHandleCollector = (keyHandle) => {
     collectedKeyHandles.add(keyHandle);
-  };
-
-  /**
-   * Stores cleanup functions returned by key handles during initial
-   * registration. Used to remove selector trigger from state property
-   * dependencies when needed. Called during unregistration to clean up all
-   * dependency subscriptions.
-   */
-  const unregisterTriggerHandleCallbacks = new Set<() => void>();
-
-  /**
-   * Indicates if the selector is currently registered.
-   */
-  let isRegistered = false;
-
-  /**
-   * Registers selector's trigger with all its dependencies. When
-   * isToPopulateUnregisterCallbacks is true (initial registration), stores
-   * cleanup callbacks for later unregistration. Prevents duplicate
-   * registrations via isRegistered flag.
-   *
-   * @param isToPopulateUnregisterCallbacks Whether to store cleanup callbacks
-   */
-  const registerTrigger = (isToPopulateUnregisterCallbacks = false): void => {
-    if (isRegistered) return;
-
-    collectedKeyHandles.forEach((handle) => {
-      const callback = handle(selectorTrigger);
-      isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
-    });
-
-    isRegistered = true;
-  };
-
-  const unregisterTrigger = (): void => {
-    unregisterTriggerHandleCallbacks.forEach((callback) => {
-      callback();
-    });
   };
 
   /**
@@ -232,6 +226,15 @@ export const createSelectorRecord = <State extends object, V>(
   };
 
   /**
+   * Marks the selector as needing recalculation.
+   * This is called when a dependency property changes, ensuring that the selector value
+   * will be recomputed the next time it is accessed or when a trigger fires.
+   */
+  const immediateTask = () => {
+    isToRecalculateValue = true;
+  };
+
+  /**
    * Collection of subscription jobs that run when selector's dependencies
    * change. When empty, triggers cleanup by unregistering selector from state
    * updates.
@@ -240,17 +243,14 @@ export const createSelectorRecord = <State extends object, V>(
 
   /**
    * Triggered when selector's dependencies change. Handles:
-   * - Marking value for recalculation
-   * - Unregistering trigger if no jobs remain (cleanup)
-   * - Running selector to get new value if jobs exist
-   * - Executing all subscription jobs with new value
+   * - If there are no active jobs (subscriptions), and the selector is registered and marked for recalculation,
+   *   unregisters the selector's trigger from all dependencies (cleanup).
+   * - If there are active jobs, recalculates the selector value if needed, and notifies all jobs with the new value.
    */
   const selectorTrigger = (): void => {
-    isToRecalculateValue = true;
-
     if (jobs.size === 0) {
+      // If no subscriptions remain, unregister the selector's trigger for cleanup
       unregisterTrigger();
-      isRegistered = false;
 
       return;
     }
@@ -260,6 +260,25 @@ export const createSelectorRecord = <State extends object, V>(
     jobs.forEach((job): void => {
       job(memValue);
     });
+  };
+
+  /**
+   * Registers the selector's trigger with all its dependency key handles.
+   * - On initial registration (isToPopulateUnregisterCallbacks = true), stores cleanup callbacks for later unregistration.
+   * - Prevents duplicate registrations using the isRegistered flag.
+   *
+   * @param isToPopulateUnregisterCallbacks Whether to store cleanup callbacks for unregistering later
+   */
+  const registerTrigger = (isToPopulateUnregisterCallbacks = false): void => {
+    if (isRegistered) return;
+
+    collectedKeyHandles.forEach((handle) => {
+      const callback = handle(immediateTask, selectorTrigger);
+
+      isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
+    });
+
+    isRegistered = true;
   };
 
   /**
