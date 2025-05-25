@@ -1,3 +1,4 @@
+import { _STATE_ENTRIES_CHANGED } from './selectStateEntriesChanged';
 export const createStateImage = (initState) => {
     let calculationAllowed = false;
     const restrictCalculation = () => {
@@ -37,10 +38,14 @@ export const createStateImage = (initState) => {
         };
         return { keyHandle, fireKey };
     };
+    let stateEntriesChanged;
     const setState = (stateChange) => [
         runWithRestrictionLifted(() => {
+            stateEntriesChanged = Object.create(null);
             const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
             Object.assign(state, mergeToState);
+            Reflect.ownKeys(stateEntriesChanged).length > 0 &&
+                (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
             return mergeToState;
         }),
         runQueue(),
@@ -62,12 +67,16 @@ export const createStateImage = (initState) => {
             const oldValue = target[p];
             target[p] = newValue;
             const { fireKey } = (_a = triggerJobStore[p]) !== null && _a !== void 0 ? _a : {};
-            if (fireKey && !Object.is(oldValue, newValue))
-                fireKey();
+            if (!Object.is(oldValue, newValue)) {
+                Object.prototype.propertyIsEnumerable.call(target, p) &&
+                    (stateEntriesChanged[p] = newValue);
+                fireKey === null || fireKey === void 0 ? void 0 : fireKey();
+            }
             return true;
         },
     };
-    const state = new Proxy(Object.assign({}, initState), proxyHandler);
+    const stateTargetObject = Object.defineProperty(Object.assign(Object.create(null), Object.assign({}, initState)), _STATE_ENTRIES_CHANGED, { value: Object.create(null), writable: true });
+    const state = new Proxy(stateTargetObject, proxyHandler);
     return { runOverState, setState };
 };
 export const createJobQueue = () => {

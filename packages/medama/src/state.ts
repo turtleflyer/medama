@@ -1,4 +1,5 @@
 import type { ReadState, Selector, SetState } from './medama.types';
+import { _STATE_ENTRIES_CHANGED, type StateEntriesChangedKey } from './selectStateEntriesChanged';
 
 type UnregisterTriggerFromKeyHandle = () => void;
 
@@ -39,6 +40,10 @@ type SetToTarget<State> = <K extends string | symbol>(
 type ProxyHandler<State> = {
   get: GetFromTarget<State>;
   set: SetToTarget<State>;
+};
+
+type WithStateEntriesChanged<State extends object> = State & {
+  [_STATE_ENTRIES_CHANGED]: Partial<State>;
 };
 
 export type RunOverState<State extends object, V> = (
@@ -160,6 +165,13 @@ export const createStateImage = <State extends object>(
   };
 
   /**
+   * Stores the set of state entries that have changed during a state update.
+   * This is used to support the selector `selectStateEntriesChanged` by exposing
+   * the changed entries through the state key `_STATE_ENTRIES_CHANGED`.
+   */
+  let stateEntriesChanged: Partial<State>;
+
+  /**
    * Updates state with new values and triggers subscriptions.
    * - Accepts either partial state object or state updater function
    * - Runs update with authorized access to state properties
@@ -172,8 +184,16 @@ export const createStateImage = <State extends object>(
     (
       [
         runWithRestrictionLifted(() => {
+          stateEntriesChanged = Object.create(null);
           const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
           Object.assign(state, mergeToState);
+
+          /**
+           * If any state entries have changed, attach the changed entries to the state object
+           * under the _STATE_ENTRIES_CHANGED symbol. Changing this entry will fire selectStateEntriesChanged.
+           */
+          Reflect.ownKeys(stateEntriesChanged).length > 0 &&
+            (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
 
           return mergeToState;
         }),
@@ -192,8 +212,11 @@ export const createStateImage = <State extends object>(
    *   values
    * - Enforces authorized access through calculationAllowed flag
    */
-  const proxyHandler: ProxyHandler<State> = {
-    get: <K extends string | symbol>(target: State, p: K): State[K & keyof State] => {
+  const proxyHandler: ProxyHandler<WithStateEntriesChanged<State>> = {
+    get: <K extends string | symbol>(
+      target: WithStateEntriesChanged<State>,
+      p: K
+    ): WithStateEntriesChanged<State>[K & (keyof State | StateEntriesChangedKey)] => {
       restrictCalculation();
 
       if (activeKeyHandleCollector) {
@@ -202,24 +225,39 @@ export const createStateImage = <State extends object>(
         activeKeyHandleCollector(keyHandle);
       }
 
-      return target[p as K & keyof State];
+      return target[p as K & (keyof State | StateEntriesChangedKey)];
     },
 
     set: <K extends string | symbol>(
-      target: State,
+      target: WithStateEntriesChanged<State>,
       p: K,
-      newValue: State[K & keyof State]
+      newValue: WithStateEntriesChanged<State>[K & (keyof State | StateEntriesChangedKey)]
     ): true => {
       restrictCalculation();
-      const oldValue = target[p as K & keyof State];
-      target[p as K & keyof State] = newValue;
-      const { fireKey } = triggerJobStore[p as K & keyof State] ?? {};
+      const oldValue = target[p as K & (keyof State | StateEntriesChangedKey)];
+      target[p as K & (keyof State | StateEntriesChangedKey)] = newValue;
+      const { fireKey } = triggerJobStore[p as K & (keyof State | StateEntriesChangedKey)] ?? {};
 
-      if (fireKey && !Object.is(oldValue, newValue)) fireKey();
+      if (!Object.is(oldValue, newValue)) {
+        /**
+         * When a state property is changed and the value is different, record the change
+         * in stateEntriesChanged for later processing and trigger all registered callbacks.
+         */
+        Object.prototype.propertyIsEnumerable.call(target, p) &&
+          (stateEntriesChanged[p as K & keyof State] = newValue as State[K & keyof State]);
+
+        fireKey?.();
+      }
 
       return true;
     },
   };
+
+  const stateTargetObject = Object.defineProperty(
+    Object.assign(Object.create(null), { ...initState }) as WithStateEntriesChanged<State>,
+    _STATE_ENTRIES_CHANGED,
+    { value: Object.create(null) as Partial<State>, writable: true }
+  );
 
   /**
    * The state object wrapped in a Proxy to:
@@ -227,7 +265,7 @@ export const createStateImage = <State extends object>(
    * - Trigger subscriptions on property changes
    * - Enforce authorized access through restriction mechanism
    */
-  const state = new Proxy({ ...initState } as State, proxyHandler);
+  const state = new Proxy(stateTargetObject, proxyHandler);
 
   return { runOverState, setState };
 };
