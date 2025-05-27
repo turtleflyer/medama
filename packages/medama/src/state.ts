@@ -124,8 +124,7 @@ export const createStateImage = <State extends object>(
     )[0];
   };
 
-  const triggerJobStore: Partial<Record<keyof State, KeyHandleRecord>> = {};
-
+  const triggerJobStore: Partial<Record<keyof State, KeyHandleRecord>> = Object.create(null);
   const { addToQueue, runQueue } = createJobQueue();
 
   /**
@@ -254,7 +253,7 @@ export const createStateImage = <State extends object>(
   };
 
   const stateTargetObject = Object.defineProperty(
-    Object.assign(Object.create(null), { ...initState }) as WithStateEntriesChanged<State>,
+    Object.assign(Object.create(null), initState) as WithStateEntriesChanged<State>,
     _STATE_ENTRIES_CHANGED,
     { value: Object.create(null) as Partial<State>, writable: true }
   );

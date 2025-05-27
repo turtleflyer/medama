@@ -115,9 +115,9 @@ export const composeMedama = ((layers, initState) => {
         });
         selectorStore = new WeakMap();
     };
-    const addLayers = (layersToAdd, initState) => composeMedama(Object.assign(Object.assign({}, layers), layersToAdd), initState);
+    const addLayers = (layersToAdd, initState) => composeMedama(Object.assign(Object.create(null), layers, layersToAdd), initState);
     const deleteLayers = (layersToDelete) => {
-        const nextLayers = Object.assign({}, layers);
+        const nextLayers = Object.assign(Object.create(null), layers);
         (Array.isArray(layersToDelete) ? layersToDelete : [layersToDelete]).forEach((layerK) => {
             delete nextLayers[layerK];
         });
@@ -136,7 +136,7 @@ export const composeMedama = ((layers, initState) => {
 const createLayerProcessorWithSubscriptionMeans = () => {
     const subscriptionMeans = [];
     let neverRun = true;
-    const processLayer = (key, layerState, subscribeToLayer, selectorIdentity, combinedLayers = Object.defineProperty({}, _COMPOSITE_STATE_SIGNATURE, {
+    const processLayer = (key, layerState, subscribeToLayer, selectorIdentity, combinedLayers = Object.defineProperty(Object.create(null), _COMPOSITE_STATE_SIGNATURE, {
         value: true,
     })) => {
         var _a;

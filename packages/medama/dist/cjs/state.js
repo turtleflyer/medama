@@ -20,7 +20,7 @@ const createStateImage = (initState) => {
             (activeKeyHandleCollector = undefined),
         ][0];
     };
-    const triggerJobStore = {};
+    const triggerJobStore = Object.create(null);
     const { addToQueue, runQueue } = (0, exports.createJobQueue)();
     const createKeyHandleRecord = () => {
         const immediateTaskSet = new Set();
@@ -78,7 +78,7 @@ const createStateImage = (initState) => {
             return true;
         },
     };
-    const stateTargetObject = Object.defineProperty(Object.assign(Object.create(null), Object.assign({}, initState)), selectStateEntriesChanged_1._STATE_ENTRIES_CHANGED, { value: Object.create(null), writable: true });
+    const stateTargetObject = Object.defineProperty(Object.assign(Object.create(null), initState), selectStateEntriesChanged_1._STATE_ENTRIES_CHANGED, { value: Object.create(null), writable: true });
     const state = new Proxy(stateTargetObject, proxyHandler);
     return { runOverState, setState };
 };

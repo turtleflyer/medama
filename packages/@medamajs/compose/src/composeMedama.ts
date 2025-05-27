@@ -316,13 +316,15 @@ export const composeMedama = (<State extends CStateG>(
     initState?: Partial<State & LayersToAdd>
   ) =>
     composeMedama<State & LayersToAdd>(
-      { ...layers, ...layersToAdd } as LayerPupilsPreventInference<State & LayersToAdd>,
+      Object.assign(Object.create(null), layers, layersToAdd) as LayerPupilsPreventInference<
+        State & LayersToAdd
+      >,
 
       initState as RevealLayersInStateRecursively<State & LayersToAdd> | undefined
     );
 
   const deleteLayers = (layersToDelete: string | string[]) => {
-    const nextLayers = { ...layers };
+    const nextLayers = Object.assign(Object.create(null), layers);
 
     (Array.isArray(layersToDelete) ? layersToDelete : [layersToDelete]).forEach((layerK) => {
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -382,12 +384,16 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
     subscribeToLayer,
     selectorIdentity,
 
-    combinedLayers = Object.defineProperty({} as State, _COMPOSITE_STATE_SIGNATURE, {
-      // Special key used to distinguish composite states from root states. This
-      // allows selectors to handle state objects differently based on their
-      // origin
-      value: true,
-    })
+    combinedLayers = Object.defineProperty(
+      Object.create(null) as State,
+      _COMPOSITE_STATE_SIGNATURE,
+      {
+        // Special key used to distinguish composite states from root states. This
+        // allows selectors to handle state objects differently based on their
+        // origin
+        value: true,
+      }
+    )
   ): State => {
     neverRun = false;
     (combinedLayers as State)[key] = layerState;
