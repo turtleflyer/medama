@@ -68,19 +68,28 @@ const createSelectorRecord = (selector, runOverState) => {
             isToRecalculateValue = false;
         }
     };
+    let isToAddValue = false;
     const immediateTask = () => {
+        if (isToRecalculateValue)
+            return;
         isToRecalculateValue = true;
+        isToAddValue = true;
     };
     const jobs = new Set();
-    const selectorTrigger = () => {
-        if (jobs.size === 0) {
-            unregisterTrigger();
-            return;
-        }
-        runSelectorWithMemoization();
-        jobs.forEach((job) => {
-            job(memValue);
-        });
+    const selectorTrigger = {
+        trigger: () => {
+            if (jobs.size === 0) {
+                unregisterTrigger();
+                return;
+            }
+            runSelectorWithMemoization();
+            jobs.forEach((job) => {
+                job(memValue);
+            });
+        },
+        isToAdd: () => {
+            return [isToAddValue, (isToAddValue = false)][0];
+        },
     };
     const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {
         if (isRegistered)

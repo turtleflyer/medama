@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>304/304</span>
+                <span class='fraction'>307/307</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>32/32</span>
+                <span class='fraction'>33/33</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>304/304</span>
+                <span class='fraction'>307/307</span>
             </div>
         
             
@@ -367,7 +367,11 @@
 <a name='L302'></a><a href='#L302'>302</a>
 <a name='L303'></a><a href='#L303'>303</a>
 <a name='L304'></a><a href='#L304'>304</a>
-<a name='L305'></a><a href='#L305'>305</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -650,6 +654,8 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-yes">819x</span>
@@ -663,7 +669,7 @@
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-yes">1630x</span>
-<span class="cline-any cline-yes">1564x</span>
+<span class="cline-any cline-yes">1562x</span>
 <span class="cline-any cline-yes">1630x</span>
 <span class="cline-any cline-yes">1630x</span>
 <span class="cline-any cline-yes">1630x</span>
@@ -672,6 +678,7 @@
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-yes">819x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { ReadState, Selector, SetState } from './medama.types';
+import type { SelectorTrigger } from './selectorStore';
 import { _STATE_ENTRIES_CHANGED, type StateEntriesChangedKey } from './selectStateEntriesChanged';
 &nbsp;
 type UnregisterTriggerFromKeyHandle = () =&gt; void;
@@ -685,7 +692,7 @@ type UnregisterTriggerFromKeyHandle = () =&gt; void;
  */
 export type KeyHandle = (
   runImmediately: () =&gt; void,
-  trigger: () =&gt; void
+  selectorTrigger: SelectorTrigger
 ) =&gt; UnregisterTriggerFromKeyHandle;
 &nbsp;
 export type KeyHandleCollector = (keyHandle: KeyHandle) =&gt; void;
@@ -813,7 +820,7 @@ export const createStateImage = &lt;State extends object&gt;(
    */
   const createKeyHandleRecord = (): KeyHandleRecord =&gt; {
     const immediateTaskSet = new Set&lt;() =&gt; void&gt;();
-    const triggerSet = new Set&lt;() =&gt; void&gt;();
+    const triggerSet = new Set&lt;SelectorTrigger&gt;();
 &nbsp;
     const keyHandle: KeyHandle = (runImmediately, trigger) =&gt; {
       immediateTaskSet.add(runImmediately);
@@ -942,26 +949,28 @@ export const createStateImage = &lt;State extends object&gt;(
   return { runOverState, setState };
 };
 &nbsp;
-type AddToQueue = (triggerSet: Set&lt;() =&gt; void&gt;) =&gt; void;
+type AddToQueue = (triggerSet: Set&lt;SelectorTrigger&gt;) =&gt; void;
 &nbsp;
 type RunQueue = () =&gt; void;
 &nbsp;
 /**
  * Creates a queue system to manage selector trigger execution.
  * - Queue is populated when state properties change via Proxy's set handler
- * - Maintains unique set of triggers to avoid duplicate executions
- * - Provides methods to add triggers and process entire queue
- * - Clears queue after processing all triggers
+ * - Relies on the inner mechanism of the selector trigger (`isToAdd`) to
+ *   determine whether the trigger method should be added to the queue, ensuring
+ *   no duplicate executions
+ * - Provides methods to add triggers and process the entire queue
+ * - Clears the queue after processing all triggers
  */
 export const createJobQueue = (): {
   addToQueue: AddToQueue;
   runQueue: RunQueue;
 } =&gt; {
-  const queue = new Set&lt;() =&gt; void&gt;();
+  let queue: (() =&gt; void)[] = [];
 &nbsp;
   const addToQueue: AddToQueue = (triggerSet) =&gt; {
-    triggerSet.forEach((trigger) =&gt; {
-      queue.add(trigger);
+    triggerSet.forEach(({ trigger, isToAdd }) =&gt; {
+      isToAdd() &amp;&amp; queue.push(trigger);
     });
   };
 &nbsp;
@@ -970,7 +979,7 @@ export const createJobQueue = (): {
       trigger();
     });
 &nbsp;
-    queue.clear();
+    queue = [];
   };
 &nbsp;
   return { addToQueue, runQueue };
@@ -982,7 +991,7 @@ export const createJobQueue = (): {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-06-19T02:27:51.277Z
+                at 2025-06-19T02:29:06.165Z
             </div>
         <script src="../prettify.js"></script>
         <script>

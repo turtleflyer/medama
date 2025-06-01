@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { Selector } from '../medama.types';
-import { createSelectorRecord } from '../selectorStore';
+import { createSelectorRecord, type SelectorTrigger } from '../selectorStore';
 import type { KeyHandleCollector } from '../state';
 
 describe('testing selector store part', () => {
@@ -11,9 +11,9 @@ describe('testing selector store part', () => {
 
     const unregisterHandle = jest.fn(() => {});
     let memImmediateTask: (() => void) | undefined;
-    let memSelectorTrigger: (() => void) | undefined;
+    let memSelectorTrigger: SelectorTrigger | undefined;
 
-    const keyHandle = jest.fn((runImmediately: () => void, trigger: () => void) => {
+    const keyHandle = jest.fn((runImmediately: () => void, trigger: SelectorTrigger) => {
       memImmediateTask = runImmediately;
       memSelectorTrigger = trigger;
 
@@ -49,8 +49,11 @@ describe('testing selector store part', () => {
     selector.mock.calls = [];
     keyHandle.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(runOverState).toHaveBeenCalledTimes(0);
     expect(selector).toHaveBeenCalledTimes(0);
     expect(keyHandle).toHaveBeenCalledTimes(0);
@@ -108,8 +111,11 @@ describe('testing selector store part', () => {
     keyHandle.mock.calls = [];
     subscriptionJob1.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(25);
     expect(subscriptionJob1).toHaveBeenCalledTimes(1);
     expect(runOverState).toHaveBeenCalledTimes(1);
@@ -169,8 +175,11 @@ describe('testing selector store part', () => {
     subscriptionJob1.mock.calls = [];
     subscriptionJob2.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(88);
     expect(calcResult2).toBe(88);
     expect(runOverState).toHaveBeenCalledTimes(1);
@@ -216,8 +225,11 @@ describe('testing selector store part', () => {
     subscriptionJob1.mock.calls = [];
     subscriptionJob2.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(88);
     expect(calcResult2).toBe(75);
     expect(runOverState).toHaveBeenCalledTimes(1);
@@ -263,8 +275,11 @@ describe('testing selector store part', () => {
     subscriptionJob1.mock.calls = [];
     subscriptionJob2.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(88);
     expect(calcResult2).toBe(75);
     expect(runOverState).toHaveBeenCalledTimes(0);
@@ -310,8 +325,11 @@ describe('testing selector store part', () => {
     subscriptionJob1.mock.calls = [];
     subscriptionJob2.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(88);
     expect(calcResult2).toBe(75);
     expect(runOverState).toHaveBeenCalledTimes(0);
@@ -351,8 +369,11 @@ describe('testing selector store part', () => {
     keyHandle.mock.calls = [];
     subscriptionJob1.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(66);
     expect(runOverState).toHaveBeenCalledTimes(1);
     expect(selector).toHaveBeenCalledTimes(1);
@@ -365,7 +386,9 @@ describe('testing selector store part', () => {
     subscriptionJob1.mock.calls = [];
 
     selectorReturn = -100;
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(66);
     expect(runOverState).toHaveBeenCalledTimes(0);
     expect(selector).toHaveBeenCalledTimes(0);
@@ -377,8 +400,11 @@ describe('testing selector store part', () => {
     keyHandle.mock.calls = [];
     subscriptionJob1.mock.calls = [];
 
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     memImmediateTask!();
-    memSelectorTrigger!();
+    expect(memSelectorTrigger!.isToAdd()).toBe(true);
+    memSelectorTrigger!.trigger();
+    expect(memSelectorTrigger!.isToAdd()).toBe(false);
     expect(calcResult1).toBe(-100);
     expect(runOverState).toHaveBeenCalledTimes(1);
     expect(selector).toHaveBeenCalledTimes(1);

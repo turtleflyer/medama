@@ -16,6 +16,23 @@ type SubscribeToStateInSelectorStore<State extends object> = <V>(
   subscription: Subscription<V>
 ) => SubscriptionMethods<State, V>;
 
+export type SelectorTrigger = {
+  /**
+   * Method to trigger the selector's functionality.
+   * This is called when the selector's dependencies change, ensuring that
+   * the selector's value is recalculated and all active subscription jobs
+   * are notified with the updated value.
+   */
+  trigger: () => void;
+
+  /**
+   * Method to check if the selector's trigger should be added to the queue.
+   * Ensures that the selector's trigger is not added to the queue multiple times.
+   * Returns a boolean indicating whether the selector's trigger has already been added.
+   */
+  isToAdd: () => boolean;
+};
+
 /**
  * Creates a store to manage selectors and their associated records. Each
  * selector is mapped to methods for:
@@ -225,13 +242,18 @@ export const createSelectorRecord = <State extends object, V>(
     }
   };
 
+  let isToAddValue = false;
+
   /**
    * Marks the selector as needing recalculation.
    * This is called when a dependency property changes, ensuring that the selector value
    * will be recomputed the next time it is accessed or when a trigger fires.
    */
   const immediateTask = () => {
+    if (isToRecalculateValue) return;
+
     isToRecalculateValue = true;
+    isToAddValue = true;
   };
 
   /**
@@ -241,25 +263,33 @@ export const createSelectorRecord = <State extends object, V>(
    */
   const jobs = new Set<SubscriptionJob<V>>();
 
-  /**
-   * Triggered when selector's dependencies change. Handles:
-   * - If there are no active jobs (subscriptions), and the selector is registered and marked for recalculation,
-   *   unregisters the selector's trigger from all dependencies (cleanup).
-   * - If there are active jobs, recalculates the selector value if needed, and notifies all jobs with the new value.
-   */
-  const selectorTrigger = (): void => {
-    if (jobs.size === 0) {
-      // If no subscriptions remain, unregister the selector's trigger for cleanup
-      unregisterTrigger();
+  const selectorTrigger: SelectorTrigger = {
+    /**
+     * Triggered when selector's dependencies change. Handles:
+     * - If there are no active jobs (subscriptions), and the selector is
+     *   registered and marked for recalculation, unregisters the selector's
+     *   trigger from all dependencies (cleanup).
+     * - If there are active jobs, recalculates the selector value if needed,
+     *   and notifies all jobs with the new value.
+     */
+    trigger: (): void => {
+      if (jobs.size === 0) {
+        // If no subscriptions remain, unregister the selector's trigger for cleanup
+        unregisterTrigger();
 
-      return;
-    }
+        return;
+      }
 
-    runSelectorWithMemoization();
+      runSelectorWithMemoization();
 
-    jobs.forEach((job): void => {
-      job(memValue);
-    });
+      jobs.forEach((job): void => {
+        job(memValue);
+      });
+    },
+
+    isToAdd: (): boolean => {
+      return ([isToAddValue, (isToAddValue = false)] as const)[0];
+    },
   };
 
   /**

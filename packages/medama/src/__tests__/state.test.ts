@@ -5,69 +5,72 @@ const symbKey = Symbol('symbKey');
 
 describe('testing state part', () => {
   test('createJobPool works correctly', () => {
-    const jobs = Array.from({ length: 5 }, () => jest.fn());
+    const jobs = Array.from({ length: 5 }, (_, i) => ({
+      trigger: jest.fn(),
+      isToAdd: () => i < 4,
+    }));
     const { addToQueue, runQueue } = createJobQueue();
 
     runQueue();
-    jobs.every((job) => {
-      expect(job).toHaveBeenCalledTimes(0);
+    jobs.every(({ trigger }) => {
+      expect(trigger).toHaveBeenCalledTimes(0);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     addToQueue(new Set([jobs[0]]));
     runQueue();
-    jobs.every((job, i) => {
-      expect(job).toHaveBeenCalledTimes(i === 0 ? 1 : 0);
+    jobs.every(({ trigger }, i) => {
+      expect(trigger).toHaveBeenCalledTimes(i === 0 ? 1 : 0);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     runQueue();
-    jobs.every((job) => {
-      expect(job).toHaveBeenCalledTimes(0);
+    jobs.every(({ trigger }) => {
+      expect(trigger).toHaveBeenCalledTimes(0);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     addToQueue(new Set(jobs));
     runQueue();
-    jobs.every((job) => {
-      expect(job).toHaveBeenCalledTimes(1);
+    jobs.every(({ trigger }, i) => {
+      expect(trigger).toHaveBeenCalledTimes(i === 4 ? 0 : 1);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     runQueue();
-    jobs.every((job) => {
-      expect(job).toHaveBeenCalledTimes(0);
+    jobs.every(({ trigger }) => {
+      expect(trigger).toHaveBeenCalledTimes(0);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     addToQueue(new Set(jobs.slice(2)));
     runQueue();
-    jobs.every((job, i) => {
-      expect(job).toHaveBeenCalledTimes(i < 2 ? 0 : 1);
+    jobs.every(({ trigger }, i) => {
+      expect(trigger).toHaveBeenCalledTimes(i < 2 || i === 4 ? 0 : 1);
     });
 
     jobs.every((job) => {
-      job.mock.calls = [];
+      job.trigger.mock.calls = [];
     });
 
     runQueue();
-    jobs.every((job) => {
-      expect(job).toHaveBeenCalledTimes(0);
+    jobs.every(({ trigger }) => {
+      expect(trigger).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -77,8 +80,16 @@ describe('testing state part', () => {
       memKeyHandle.push(keyHandle);
     });
 
+    let isToAddValue = true;
     const immediateTask = jest.fn(() => {});
-    const selectorTrigger = jest.fn(() => {});
+
+    const selectorTrigger = {
+      trigger: jest.fn(() => {}),
+
+      isToAdd: () => {
+        return ([isToAddValue, (isToAddValue = false)] as const)[0];
+      },
+    };
 
     let { runOverState, setState } = createStateImage<{
       a: number;
@@ -118,26 +129,29 @@ describe('testing state part', () => {
     setState({ a: 15 });
     expect(runOverState((state) => state.a)).toBe(15);
     expect(immediateTask).toHaveBeenCalledTimes(1);
-    expect(selectorTrigger).toHaveBeenCalledTimes(1);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(1);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ 2: 'no', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 15, 2: 'no', [symbKey]: false });
     expect(immediateTask).toHaveBeenCalledTimes(0);
-    expect(selectorTrigger).toHaveBeenCalledTimes(0);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(0);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ a: 17, 2: 'go', [symbKey]: true });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 17, 2: 'go', [symbKey]: true });
     expect(immediateTask).toHaveBeenCalledTimes(1);
-    expect(selectorTrigger).toHaveBeenCalledTimes(1);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(1);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     unregisterCallbacks1.forEach((callback) => {
       callback();
@@ -145,7 +159,7 @@ describe('testing state part', () => {
     setState({ a: 200 });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 200, 2: 'go', [symbKey]: true });
     expect(immediateTask).toHaveBeenCalledTimes(0);
-    expect(selectorTrigger).toHaveBeenCalledTimes(0);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(0);
 
     memKeyHandle = [];
 
@@ -166,40 +180,45 @@ describe('testing state part', () => {
     );
     expect(unregisterCallbacks2).toHaveLength(2);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ [symbKey]: false });
     expect(runOverState((state) => state[symbKey])).toBe(false);
     expect(immediateTask).toHaveBeenCalledTimes(1);
-    expect(selectorTrigger).toHaveBeenCalledTimes(1);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(1);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ a: 100, [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 100, 2: 'see', [symbKey]: false });
     expect(immediateTask).toHaveBeenCalledTimes(0);
-    expect(selectorTrigger).toHaveBeenCalledTimes(0);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(0);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ a: 700, 2: 'win', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 700, 2: 'win', [symbKey]: false });
     expect(immediateTask).toHaveBeenCalledTimes(1);
-    expect(selectorTrigger).toHaveBeenCalledTimes(1);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(1);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     setState({ a: -1, 2: 'loose', [symbKey]: true });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: -1, 2: 'loose', [symbKey]: true });
     expect(immediateTask).toHaveBeenCalledTimes(2);
-    expect(selectorTrigger).toHaveBeenCalledTimes(1);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(1);
 
+    isToAddValue = true;
     immediateTask.mock.calls = [];
-    selectorTrigger.mock.calls = [];
+    selectorTrigger.trigger.mock.calls = [];
 
     unregisterCallbacks2.forEach((callback) => {
       callback();
@@ -207,7 +226,7 @@ describe('testing state part', () => {
     setState({ a: 5, 2: 'can', [symbKey]: false });
     expect(runOverState((state) => ({ ...state }))).toEqual({ a: 5, 2: 'can', [symbKey]: false });
     expect(immediateTask).toHaveBeenCalledTimes(0);
-    expect(selectorTrigger).toHaveBeenCalledTimes(0);
+    expect(selectorTrigger.trigger).toHaveBeenCalledTimes(0);
 
     let memSate: {};
 

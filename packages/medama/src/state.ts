@@ -1,4 +1,5 @@
 import type { ReadState, Selector, SetState } from './medama.types';
+import type { SelectorTrigger } from './selectorStore';
 import { _STATE_ENTRIES_CHANGED, type StateEntriesChangedKey } from './selectStateEntriesChanged';
 
 type UnregisterTriggerFromKeyHandle = () => void;
@@ -12,7 +13,7 @@ type UnregisterTriggerFromKeyHandle = () => void;
  */
 export type KeyHandle = (
   runImmediately: () => void,
-  trigger: () => void
+  selectorTrigger: SelectorTrigger
 ) => UnregisterTriggerFromKeyHandle;
 
 export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
@@ -140,7 +141,7 @@ export const createStateImage = <State extends object>(
    */
   const createKeyHandleRecord = (): KeyHandleRecord => {
     const immediateTaskSet = new Set<() => void>();
-    const triggerSet = new Set<() => void>();
+    const triggerSet = new Set<SelectorTrigger>();
 
     const keyHandle: KeyHandle = (runImmediately, trigger) => {
       immediateTaskSet.add(runImmediately);
@@ -269,26 +270,28 @@ export const createStateImage = <State extends object>(
   return { runOverState, setState };
 };
 
-type AddToQueue = (triggerSet: Set<() => void>) => void;
+type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
 
 type RunQueue = () => void;
 
 /**
  * Creates a queue system to manage selector trigger execution.
  * - Queue is populated when state properties change via Proxy's set handler
- * - Maintains unique set of triggers to avoid duplicate executions
- * - Provides methods to add triggers and process entire queue
- * - Clears queue after processing all triggers
+ * - Relies on the inner mechanism of the selector trigger (`isToAdd`) to
+ *   determine whether the trigger method should be added to the queue, ensuring
+ *   no duplicate executions
+ * - Provides methods to add triggers and process the entire queue
+ * - Clears the queue after processing all triggers
  */
 export const createJobQueue = (): {
   addToQueue: AddToQueue;
   runQueue: RunQueue;
 } => {
-  const queue = new Set<() => void>();
+  let queue: (() => void)[] = [];
 
   const addToQueue: AddToQueue = (triggerSet) => {
-    triggerSet.forEach((trigger) => {
-      queue.add(trigger);
+    triggerSet.forEach(({ trigger, isToAdd }) => {
+      isToAdd() && queue.push(trigger);
     });
   };
 
@@ -297,7 +300,7 @@ export const createJobQueue = (): {
       trigger();
     });
 
-    queue.clear();
+    queue = [];
   };
 
   return { addToQueue, runQueue };

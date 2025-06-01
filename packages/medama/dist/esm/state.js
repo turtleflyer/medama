@@ -80,17 +80,17 @@ export const createStateImage = (initState) => {
     return { runOverState, setState };
 };
 export const createJobQueue = () => {
-    const queue = new Set();
+    let queue = [];
     const addToQueue = (triggerSet) => {
-        triggerSet.forEach((trigger) => {
-            queue.add(trigger);
+        triggerSet.forEach(({ trigger, isToAdd }) => {
+            isToAdd() && queue.push(trigger);
         });
     };
     const runQueue = () => {
         queue.forEach((trigger) => {
             trigger();
         });
-        queue.clear();
+        queue = [];
     };
     return { addToQueue, runQueue };
 };
