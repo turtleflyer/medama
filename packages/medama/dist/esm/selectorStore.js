@@ -84,7 +84,9 @@ export const createSelectorRecord = (selector, runOverState) => {
             });
         },
         isToAdd: () => {
-            return [isToAddValue, (isToAddValue = false)][0];
+            const toReturn = isToAddValue;
+            isToAddValue = false;
+            return toReturn;
         },
     };
     const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {

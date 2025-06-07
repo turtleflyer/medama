@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>307/307</span>
+                <span class='fraction'>306/306</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>307/307</span>
+                <span class='fraction'>306/306</span>
             </div>
         
             
@@ -369,8 +369,7 @@
 <a name='L304'></a><a href='#L304'>304</a>
 <a name='L305'></a><a href='#L305'>305</a>
 <a name='L306'></a><a href='#L306'>306</a>
-<a name='L307'></a><a href='#L307'>307</a>
-<a name='L308'></a><a href='#L308'>308</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L307'></a><a href='#L307'>307</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -466,6 +465,8 @@
 <span class="cline-any cline-yes">4053x</span>
 <span class="cline-any cline-yes">4053x</span>
 <span class="cline-any cline-yes">4053x</span>
+<span class="cline-any cline-yes">4053x</span>
+<span class="cline-any cline-yes">4053x</span>
 <span class="cline-any cline-yes">818x</span>
 <span class="cline-any cline-yes">818x</span>
 <span class="cline-any cline-yes">818x</span>
@@ -487,9 +488,6 @@
 <span class="cline-any cline-yes">818x</span>
 <span class="cline-any cline-yes">818x</span>
 <span class="cline-any cline-yes">818x</span>
-<span class="cline-any cline-yes">2430x</span>
-<span class="cline-any cline-yes">2430x</span>
-<span class="cline-any cline-yes">2430x</span>
 <span class="cline-any cline-yes">2430x</span>
 <span class="cline-any cline-yes">2430x</span>
 <span class="cline-any cline-yes">2430x</span>
@@ -771,8 +769,10 @@ export const createStateImage = &lt;State extends object&gt;(
    */
   const runWithRestrictionLifted = &lt;V&gt;(toRun: () =&gt; V): V =&gt; {
     calculationAllowed = true;
+    const toReturn = toRun();
+    calculationAllowed = false;
 &nbsp;
-    return ([toRun(), (calculationAllowed = false)] as const)[0];
+    return toReturn;
   };
 &nbsp;
   /**
@@ -795,13 +795,10 @@ export const createStateImage = &lt;State extends object&gt;(
    */
   const runOverState: RunOverState&lt;State, unknown&gt; = (selector, keyHandleCollector?) =&gt; {
     activeKeyHandleCollector = keyHandleCollector;
+    const toReturn = runWithRestrictionLifted(() =&gt; selector(state));
+    activeKeyHandleCollector = undefined;
 &nbsp;
-    return (
-      [
-        runWithRestrictionLifted(() =&gt; selector(state)),
-        (activeKeyHandleCollector = undefined),
-      ] as const
-    )[0];
+    return toReturn;
   };
 &nbsp;
   const triggerJobStore: Partial&lt;Record&lt;keyof State, KeyHandleRecord&gt;&gt; = Object.create(null);
@@ -859,27 +856,27 @@ export const createStateImage = &lt;State extends object&gt;(
    * @param stateChange Partial state object or updater function
    * @returns Applied state changes
    */
-  const setState: SetState&lt;State&gt; = (stateChange) =&gt;
-    (
-      [
-        runWithRestrictionLifted(() =&gt; {
-          stateEntriesChanged = Object.create(null);
-          const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
-          Object.assign(state, mergeToState);
+  const setState: SetState&lt;State&gt; = (stateChange) =&gt; {
+    const toReturn = runWithRestrictionLifted(() =&gt; {
+      stateEntriesChanged = Object.create(null);
+      const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
+      Object.assign(state, mergeToState);
 &nbsp;
-          /**
-           * If any state entries have changed, attach the changed entries to the state object
-           * under the _STATE_ENTRIES_CHANGED symbol. Changing this entry will fire selectStateEntriesChanged.
-           */
-          Reflect.ownKeys(stateEntriesChanged).length &gt; 0 &amp;&amp;
-            (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
+      /**
+       * If any state entries have changed, attach the changed entries to the
+       * state object under the _STATE_ENTRIES_CHANGED symbol. Changing this
+       * entry will fire selectStateEntriesChanged.
+       */
+      Reflect.ownKeys(stateEntriesChanged).length &gt; 0 &amp;&amp;
+        (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
 &nbsp;
-          return mergeToState;
-        }),
+      return mergeToState;
+    });
 &nbsp;
-        runQueue(),
-      ] as const
-    )[0];
+    runQueue();
+&nbsp;
+    return toReturn;
+  };
 &nbsp;
   /**
    * Creates a Proxy handler for the state object with following
@@ -991,7 +988,7 @@ export const createJobQueue = (): {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-06-19T02:29:06.165Z
+                at 2025-06-19T02:34:29.139Z
             </div>
         <script src="../prettify.js"></script>
         <script>

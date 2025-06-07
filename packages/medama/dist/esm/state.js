@@ -7,15 +7,16 @@ export const createStateImage = (initState) => {
     };
     const runWithRestrictionLifted = (toRun) => {
         calculationAllowed = true;
-        return [toRun(), (calculationAllowed = false)][0];
+        const toReturn = toRun();
+        calculationAllowed = false;
+        return toReturn;
     };
     let activeKeyHandleCollector;
     const runOverState = (selector, keyHandleCollector) => {
         activeKeyHandleCollector = keyHandleCollector;
-        return [
-            runWithRestrictionLifted(() => selector(state)),
-            (activeKeyHandleCollector = undefined),
-        ][0];
+        const toReturn = runWithRestrictionLifted(() => selector(state));
+        activeKeyHandleCollector = undefined;
+        return toReturn;
     };
     const triggerJobStore = Object.create(null);
     const { addToQueue, runQueue } = createJobQueue();
@@ -39,17 +40,18 @@ export const createStateImage = (initState) => {
         return { keyHandle, fireKey };
     };
     let stateEntriesChanged;
-    const setState = (stateChange) => [
-        runWithRestrictionLifted(() => {
+    const setState = (stateChange) => {
+        const toReturn = runWithRestrictionLifted(() => {
             stateEntriesChanged = Object.create(null);
             const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
             Object.assign(state, mergeToState);
             Reflect.ownKeys(stateEntriesChanged).length > 0 &&
                 (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
             return mergeToState;
-        }),
-        runQueue(),
-    ][0];
+        });
+        runQueue();
+        return toReturn;
+    };
     const proxyHandler = {
         get: (target, p) => {
             var _a;

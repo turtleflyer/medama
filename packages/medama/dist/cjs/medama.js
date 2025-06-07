@@ -15,10 +15,9 @@ const createMedama = (initState) => {
     const subscribeToState = (selector, subscription) => {
         try {
             flagSubscriptionInProgress = true;
-            return [
-                selectorStore.subscribeToStateInSelectorStore(selector, subscription),
-                (flagSubscriptionInProgress = false),
-            ][0];
+            const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
+            flagSubscriptionInProgress = false;
+            return toReturn;
         }
         catch (e) {
             resetInit();
@@ -41,7 +40,9 @@ const createMedama = (initState) => {
             if (flagStateUpdating)
                 throw new Error('Medama Error: A subscription job launches the state update');
             flagStateUpdating = true;
-            return [state.setState(stateChange), (flagStateUpdating = false)][0];
+            const toReturn = state.setState(stateChange);
+            flagStateUpdating = false;
+            return toReturn;
         }
         catch (e) {
             resetInit();

@@ -288,7 +288,10 @@ export const createSelectorRecord = <State extends object, V>(
     },
 
     isToAdd: (): boolean => {
-      return ([isToAddValue, (isToAddValue = false)] as const)[0];
+      const toReturn = isToAddValue;
+      isToAddValue = false;
+
+      return toReturn;
     },
   };
 

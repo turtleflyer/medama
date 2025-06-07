@@ -92,8 +92,10 @@ export const createStateImage = <State extends object>(
    */
   const runWithRestrictionLifted = <V>(toRun: () => V): V => {
     calculationAllowed = true;
+    const toReturn = toRun();
+    calculationAllowed = false;
 
-    return ([toRun(), (calculationAllowed = false)] as const)[0];
+    return toReturn;
   };
 
   /**
@@ -116,13 +118,10 @@ export const createStateImage = <State extends object>(
    */
   const runOverState: RunOverState<State, unknown> = (selector, keyHandleCollector?) => {
     activeKeyHandleCollector = keyHandleCollector;
+    const toReturn = runWithRestrictionLifted(() => selector(state));
+    activeKeyHandleCollector = undefined;
 
-    return (
-      [
-        runWithRestrictionLifted(() => selector(state)),
-        (activeKeyHandleCollector = undefined),
-      ] as const
-    )[0];
+    return toReturn;
   };
 
   const triggerJobStore: Partial<Record<keyof State, KeyHandleRecord>> = Object.create(null);
@@ -180,27 +179,27 @@ export const createStateImage = <State extends object>(
    * @param stateChange Partial state object or updater function
    * @returns Applied state changes
    */
-  const setState: SetState<State> = (stateChange) =>
-    (
-      [
-        runWithRestrictionLifted(() => {
-          stateEntriesChanged = Object.create(null);
-          const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
-          Object.assign(state, mergeToState);
+  const setState: SetState<State> = (stateChange) => {
+    const toReturn = runWithRestrictionLifted(() => {
+      stateEntriesChanged = Object.create(null);
+      const mergeToState = typeof stateChange === 'function' ? stateChange(state) : stateChange;
+      Object.assign(state, mergeToState);
 
-          /**
-           * If any state entries have changed, attach the changed entries to the state object
-           * under the _STATE_ENTRIES_CHANGED symbol. Changing this entry will fire selectStateEntriesChanged.
-           */
-          Reflect.ownKeys(stateEntriesChanged).length > 0 &&
-            (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
+      /**
+       * If any state entries have changed, attach the changed entries to the
+       * state object under the _STATE_ENTRIES_CHANGED symbol. Changing this
+       * entry will fire selectStateEntriesChanged.
+       */
+      Reflect.ownKeys(stateEntriesChanged).length > 0 &&
+        (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
 
-          return mergeToState;
-        }),
+      return mergeToState;
+    });
 
-        runQueue(),
-      ] as const
-    )[0];
+    runQueue();
+
+    return toReturn;
+  };
 
   /**
    * Creates a Proxy handler for the state object with following

@@ -291,9 +291,9 @@ export const composeMedama = (<State extends CStateG>(
         setNestedState?.(toMerge!);
       });
 
-      return (
-        [mergeToState as SChange, isUpdateInitiator && signalDeferredJobsToResolve()] as const
-      )[0];
+      isUpdateInitiator && signalDeferredJobsToResolve();
+
+      return mergeToState;
     } catch (e) {
       initReset();
 
@@ -539,7 +539,12 @@ const createSelectorRecord = <V>(
       });
     },
 
-    isToAdd: (): boolean => ([isToAddValue, (isToAddValue = false)] as const)[0],
+    isToAdd: (): boolean => {
+      const toReturn = isToAddValue;
+      isToAddValue = false;
+
+      return toReturn;
+    },
   };
 
   let subscribeMethodsCached: SubscribeToLayerWithSelector[] | undefined = undefined;

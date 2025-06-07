@@ -53,13 +53,10 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
   ): SubscriptionMethods<State, V> => {
     try {
       flagSubscriptionInProgress = true;
+      const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
+      flagSubscriptionInProgress = false;
 
-      return (
-        [
-          selectorStore.subscribeToStateInSelectorStore(selector, subscription),
-          (flagSubscriptionInProgress = false),
-        ] as const
-      )[0];
+      return toReturn;
     } catch (e) {
       resetInit();
 
@@ -86,8 +83,10 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
         throw new Error('Medama Error: A subscription job launches the state update');
 
       flagStateUpdating = true;
+      const toReturn = state.setState(stateChange);
+      flagStateUpdating = false;
 
-      return ([state.setState(stateChange), (flagStateUpdating = false)] as const)[0];
+      return toReturn;
     } catch (e) {
       resetInit();
 

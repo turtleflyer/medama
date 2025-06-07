@@ -104,7 +104,8 @@ exports.composeMedama = ((layers, initState) => {
                 const { setState: setNestedState } = (_a = pupilMap[key]) !== null && _a !== void 0 ? _a : {};
                 setNestedState === null || setNestedState === void 0 ? void 0 : setNestedState(toMerge);
             });
-            return [mergeToState, isUpdateInitiator && signalDeferredJobsToResolve()][0];
+            isUpdateInitiator && signalDeferredJobsToResolve();
+            return mergeToState;
         }
         catch (e) {
             initReset();
@@ -193,7 +194,11 @@ const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun,
                 job(memValue);
             });
         },
-        isToAdd: () => [isToAddValue, (isToAddValue = false)][0],
+        isToAdd: () => {
+            const toReturn = isToAddValue;
+            isToAddValue = false;
+            return toReturn;
+        },
     };
     let subscribeMethodsCached = undefined;
     const registerTrigger = () => {
