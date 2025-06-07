@@ -174,19 +174,26 @@ const createSelectorRecord = (calculateResult, addToStateQueueAndSubscribeOrRun,
             isToRecalculateValue = false;
         }
     };
+    let isToAddValue = false;
     const immediateTask = () => {
+        if (isToRecalculateValue)
+            return;
         isToRecalculateValue = true;
+        isToAddValue = true;
     };
     const jobs = new Set();
-    const selectorTrigger = () => {
-        if (jobs.size === 0) {
-            unsubscribePoolFromLayers();
-            return;
-        }
-        runSelectorWithMemoization();
-        jobs.forEach((job) => {
-            job(memValue);
-        });
+    const selectorTrigger = {
+        trigger: () => {
+            if (jobs.size === 0) {
+                unsubscribePoolFromLayers();
+                return;
+            }
+            runSelectorWithMemoization();
+            jobs.forEach((job) => {
+                job(memValue);
+            });
+        },
+        isToAdd: () => [isToAddValue, (isToAddValue = false)][0],
     };
     let subscribeMethodsCached = undefined;
     const registerTrigger = () => {

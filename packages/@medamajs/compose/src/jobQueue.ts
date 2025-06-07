@@ -1,3 +1,20 @@
+export type SelectorTrigger = {
+  /**
+   * Method to trigger the selector's functionality.
+   * This is called when the selector's dependencies change, ensuring that
+   * the selector's value is recalculated and all active subscription jobs
+   * are notified with the updated value.
+   */
+  trigger: () => void;
+
+  /**
+   * Method to check if the selector's trigger should be added to the queue.
+   * Ensures that the selector's trigger is not added to the queue multiple times.
+   * Returns a boolean indicating whether the selector's trigger has already been added.
+   */
+  isToAdd: () => boolean;
+};
+
 type JobQueueMethods = {
   /**
    * Processes all jobs in queue sequentially until queue is empty. Each job is
@@ -7,9 +24,8 @@ type JobQueueMethods = {
 
   /**
    * Adds a new job to the queue. Jobs can be added during queue processing.
-   * Uses Set to ensure job uniqueness.
    */
-  addToQueue: (job: () => void) => void;
+  addToQueue: (selectorTrigger: SelectorTrigger) => void;
 
   /**
    * Clears all pending jobs from queue. Used during initialization and error
@@ -24,32 +40,30 @@ type JobQueueMethods = {
  * - Process all queued jobs sequentially
  * - Reset queue by clearing all pending jobs
  *
- * Uses Set to maintain unique jobs and ensure FIFO processing order. New jobs
- * can be added while processing existing ones.
+ * Ensures FIFO processing order. New jobs can be added while processing
+ * existing ones.
  *
  * @returns Object with queue management methods: processQueue, addToQueue,
  * resetQueue
  */
 export const createJobQueue = (): JobQueueMethods => {
-  const jobQueue = new Set<() => void>();
+  let jobQueue: (() => void)[] = [];
 
   const processQueue = (): void => {
-    while (jobQueue.size > 0) {
-      // jobPool is not empty
+    let toRun: (() => void) | undefined;
 
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const toRun = jobQueue.values().next().value!;
-      jobQueue.delete(toRun);
-      toRun();
-    }
+    do {
+      toRun?.();
+      toRun = jobQueue.shift();
+    } while (toRun);
   };
 
-  const addToQueue = (job: () => void): void => {
-    jobQueue.add(job);
+  const addToQueue = ({ trigger, isToAdd }: SelectorTrigger): void => {
+    isToAdd() && jobQueue.push(trigger);
   };
 
   const resetQueue = (): void => {
-    jobQueue.clear();
+    jobQueue = [];
   };
 
   return { processQueue, addToQueue, resetQueue };

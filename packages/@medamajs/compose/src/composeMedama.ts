@@ -19,7 +19,7 @@ import type {
 import type { ComposeMedama, CompositeMedama, IsComposite } from './composeMedama.types';
 import { _COMPOSITE_STATE_SIGNATURE, _RELAY_SUBSCRIPTION_MEANS } from './const';
 import { forEachOnOwnNumerableProps } from './forEachOnOwnNumerableProps';
-import { createJobQueue } from './jobQueue';
+import { createJobQueue, type SelectorTrigger } from './jobQueue';
 import {
   createReadWorkModeManager,
   createUpdateWorkModeManager,
@@ -464,7 +464,7 @@ type SelectorRecord<V> = {
  */
 const createSelectorRecord = <V>(
   calculateResult: () => V,
-  addToStateQueueAndSubscribeOrRun: Defer,
+  addToStateQueueAndSubscribeOrRun: Defer<SelectorTrigger>,
   getSubscriptionMeans: GetSubscriptionMeans
 ): SelectorRecord<V> => {
   /**
@@ -501,13 +501,18 @@ const createSelectorRecord = <V>(
     }
   };
 
+  let isToAddValue = false;
+
   /**
    * Marks the selector as needing recalculation.
    * This is called when a dependency in a nested layer changes, ensuring that
    * the selector value will be recomputed the next time it is accessed or when a trigger fires.
    */
   const immediateTask = () => {
+    if (isToRecalculateValue) return;
+
     isToRecalculateValue = true;
+    isToAddValue = true;
   };
 
   /**
@@ -515,22 +520,26 @@ const createSelectorRecord = <V>(
    */
   const jobs = new Set<SubscriptionJob<V>>();
 
-  /**
-   * Triggered when selector dependencies change. Handles recalculation and
-   * subscription notifications. Cleans up when no subscriptions remain.
-   */
-  const selectorTrigger = (): void => {
-    if (jobs.size === 0) {
-      unsubscribePoolFromLayers();
+  const selectorTrigger: SelectorTrigger = {
+    /**
+     * Triggered when selector dependencies change. Handles recalculation and
+     * subscription notifications. Cleans up when no subscriptions remain.
+     */
+    trigger: (): void => {
+      if (jobs.size === 0) {
+        unsubscribePoolFromLayers();
 
-      return;
-    }
+        return;
+      }
 
-    runSelectorWithMemoization();
+      runSelectorWithMemoization();
 
-    jobs.forEach((job): void => {
-      job(memValue);
-    });
+      jobs.forEach((job): void => {
+        job(memValue);
+      });
+    },
+
+    isToAdd: (): boolean => ([isToAddValue, (isToAddValue = false)] as const)[0],
   };
 
   let subscribeMethodsCached: SubscribeToLayerWithSelector[] | undefined = undefined;

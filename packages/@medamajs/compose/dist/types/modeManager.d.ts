@@ -8,13 +8,13 @@ type ReadWorkModeMethods = {
     resetReadWorkMode: () => void;
 };
 export declare const createReadWorkModeManager: () => ReadWorkModeMethods;
-export type Defer = (runImmediately: () => void, job: () => void) => void;
+export type Defer<Job> = (runImmediately: () => void, job: Job) => void;
 type Reset = () => void;
-type DeferrerMethods = {
-    defer: Defer;
+type DeferrerMethods<Job> = {
+    defer: Defer<Job>;
     reset: Reset;
 };
-type CreateDeferrer = (deferJob: (job: () => void) => void, resolveDeferred: () => void) => DeferrerMethods;
+type CreateDeferrer = <Job>(deferJob: (job: Job) => void, resolveDeferred: () => void) => DeferrerMethods<Job>;
 export type SubscribeToLayerWithSelector = (subscription: () => void) => UnsubscribeFromState;
 type GetSubscribeToLayerWithSelector = (subscribeToLayer: SubscribeToState<{}>, selector: Selector<{}, void>) => SubscribeToLayerWithSelector;
 type UpdateWorkModeMethods = {

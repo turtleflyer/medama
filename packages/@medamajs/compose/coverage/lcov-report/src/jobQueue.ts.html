@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>56/56</span>
+                <span class='fraction'>70/70</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>56/56</span>
+                <span class='fraction'>70/70</span>
             </div>
         
             
@@ -119,7 +119,37 @@
 <a name='L54'></a><a href='#L54'>54</a>
 <a name='L55'></a><a href='#L55'>55</a>
 <a name='L56'></a><a href='#L56'>56</a>
-<a name='L57'></a><a href='#L57'>57</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -156,13 +186,11 @@
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2408x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
-<span class="cline-any cline-yes">3812x</span>
+<span class="cline-any cline-yes">2408x</span>
+<span class="cline-any cline-yes">2408x</span>
+<span class="cline-any cline-yes">6220x</span>
+<span class="cline-any cline-yes">6220x</span>
+<span class="cline-any cline-yes">2408x</span>
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2663x</span>
@@ -175,7 +203,24 @@
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2663x</span>
 <span class="cline-any cline-yes">2663x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">type JobQueueMethods = {
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export type SelectorTrigger = {
+  /**
+   * Method to trigger the selector's functionality.
+   * This is called when the selector's dependencies change, ensuring that
+   * the selector's value is recalculated and all active subscription jobs
+   * are notified with the updated value.
+   */
+  trigger: () =&gt; void;
+&nbsp;
+  /**
+   * Method to check if the selector's trigger should be added to the queue.
+   * Ensures that the selector's trigger is not added to the queue multiple times.
+   * Returns a boolean indicating whether the selector's trigger has already been added.
+   */
+  isToAdd: () =&gt; boolean;
+};
+&nbsp;
+type JobQueueMethods = {
   /**
    * Processes all jobs in queue sequentially until queue is empty. Each job is
    * removed from queue before execution.
@@ -184,9 +229,8 @@
 &nbsp;
   /**
    * Adds a new job to the queue. Jobs can be added during queue processing.
-   * Uses Set to ensure job uniqueness.
    */
-  addToQueue: (job: () =&gt; void) =&gt; void;
+  addToQueue: (selectorTrigger: SelectorTrigger) =&gt; void;
 &nbsp;
   /**
    * Clears all pending jobs from queue. Used during initialization and error
@@ -201,32 +245,30 @@
  * - Process all queued jobs sequentially
  * - Reset queue by clearing all pending jobs
  *
- * Uses Set to maintain unique jobs and ensure FIFO processing order. New jobs
- * can be added while processing existing ones.
+ * Ensures FIFO processing order. New jobs can be added while processing
+ * existing ones.
  *
  * @returns Object with queue management methods: processQueue, addToQueue,
  * resetQueue
  */
 export const createJobQueue = (): JobQueueMethods =&gt; {
-  const jobQueue = new Set&lt;() =&gt; void&gt;();
+  let jobQueue: (() =&gt; void)[] = [];
 &nbsp;
   const processQueue = (): void =&gt; {
-    while (jobQueue.size &gt; 0) {
-      // jobPool is not empty
+    let toRun: (() =&gt; void) | undefined;
 &nbsp;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const toRun = jobQueue.values().next().value!;
-      jobQueue.delete(toRun);
-      toRun();
-    }
+    do {
+      toRun?.();
+      toRun = jobQueue.shift();
+    } while (toRun);
   };
 &nbsp;
-  const addToQueue = (job: () =&gt; void): void =&gt; {
-    jobQueue.add(job);
+  const addToQueue = ({ trigger, isToAdd }: SelectorTrigger): void =&gt; {
+    isToAdd() &amp;&amp; jobQueue.push(trigger);
   };
 &nbsp;
   const resetQueue = (): void =&gt; {
-    jobQueue.clear();
+    jobQueue = [];
   };
 &nbsp;
   return { processQueue, addToQueue, resetQueue };
@@ -238,7 +280,7 @@ export const createJobQueue = (): JobQueueMethods =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-06-19T02:27:28.111Z
+                at 2025-06-19T02:39:27.495Z
             </div>
         <script src="../prettify.js"></script>
         <script>

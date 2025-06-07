@@ -1,17 +1,17 @@
 export const createJobQueue = () => {
-    const jobQueue = new Set();
+    let jobQueue = [];
     const processQueue = () => {
-        while (jobQueue.size > 0) {
-            const toRun = jobQueue.values().next().value;
-            jobQueue.delete(toRun);
-            toRun();
-        }
+        let toRun;
+        do {
+            toRun === null || toRun === void 0 ? void 0 : toRun();
+            toRun = jobQueue.shift();
+        } while (toRun);
     };
-    const addToQueue = (job) => {
-        jobQueue.add(job);
+    const addToQueue = ({ trigger, isToAdd }) => {
+        isToAdd() && jobQueue.push(trigger);
     };
     const resetQueue = () => {
-        jobQueue.clear();
+        jobQueue = [];
     };
     return { processQueue, addToQueue, resetQueue };
 };

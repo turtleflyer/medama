@@ -101,17 +101,17 @@ export const createReadWorkModeManager = (): ReadWorkModeMethods => {
  * Defers job and subscribes to resolution signal (if not already subscribed).
  *
  * @param runImmediately Function to execute job immediately if conditions allow
- * @param job Function representing the job to be deferred
+ * @param job Object or function representing the job to be deferred
  */
-export type Defer = (runImmediately: () => void, job: () => void) => void;
+export type Defer<Job> = (runImmediately: () => void, job: Job) => void;
 
 type Reset = () => void;
 
-type DeferrerMethods = {
+type DeferrerMethods<Job> = {
   /**
    * Defers job and subscribes to resolution signal (if not already subscribed)
    */
-  defer: Defer;
+  defer: Defer<Job>;
 
   /**
    * Resets subscription state to false. Used during initialization and error
@@ -120,10 +120,10 @@ type DeferrerMethods = {
   reset: Reset;
 };
 
-type CreateDeferrer = (
-  deferJob: (job: () => void) => void,
+type CreateDeferrer = <Job>(
+  deferJob: (job: Job) => void,
   resolveDeferred: () => void
-) => DeferrerMethods;
+) => DeferrerMethods<Job>;
 
 export type SubscribeToLayerWithSelector = (subscription: () => void) => UnsubscribeFromState;
 
