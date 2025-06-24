@@ -20,12 +20,13 @@
   },
   "scripts": {
     "test": "jest",
+    "test:build": "jest --config jest.build.config.ts",
     "lint": "eslint",
     "clean": "rimraf ./dist",
     "build:esm": "tsc --build tsconfig.esm.json",
     "build:cjs": "tsc --build tsconfig.cjs.json",
     "build": "npm run clean && npm run build:cjs && npm run build:esm",
-    "preversion": "npm run lint && npm run build && npm test"
+    "preversion": "npm run lint && npm test && npm run build && npm run test:build"
   },
   "publishConfig": {
     "access": "public"

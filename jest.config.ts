@@ -7,11 +7,10 @@ const config: Config = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',
-  preset: 'ts-jest',
   resetMocks: true,
   resetModules: true,
-  transform: { '.*.ts': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
-  testMatch: ["**/__tests__/**/*.test.ts"]
+  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  testMatch: ['**/__tests__/**/(?!*.build)*.test.ts'],
 };
 
 export default config;
