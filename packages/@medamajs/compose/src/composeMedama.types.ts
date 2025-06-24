@@ -174,6 +174,6 @@ export type ComposeMedama = {
  */
 export type IsComposite = <State extends object>(
   state: State
-) => state is State extends CStateG ? CompositeState<State> : never;
+) => state is CompositeState<State & CStateG>;
 
 export type { CompositeState };

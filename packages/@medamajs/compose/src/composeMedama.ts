@@ -509,5 +509,4 @@ const createSubscriptionManagementForSelector = (
  */
 export const isComposite: IsComposite = <State extends object>(
   state: State
-): state is State extends CStateG ? CompositeState<State> : never =>
-  _COMPOSITE_STATE_SIGNATURE in state;
+): state is CompositeState<State & CStateG> => _COMPOSITE_STATE_SIGNATURE in state;

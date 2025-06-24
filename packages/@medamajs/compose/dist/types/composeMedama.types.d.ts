@@ -24,6 +24,6 @@ export type ComposeMedama = {
     <State extends CStateG, Init extends RevealLayersInStateRecursively<State>>(layers: LayerPupils<State>, initState?: Init): Normalize<CompositeMedama<Merge<State, Init>>>;
     <State extends CStateG>(layers: LayerPupilsPreventInference<State>, initState?: RevealLayersInStateRecursively<State>): Normalize<CompositeMedama<State>>;
 };
-export type IsComposite = <State extends object>(state: State) => state is State extends CStateG ? CompositeState<State> : never;
+export type IsComposite = <State extends object>(state: State) => state is CompositeState<State & CStateG>;
 export type { CompositeState };
 //# sourceMappingURL=composeMedama.types.d.ts.map
