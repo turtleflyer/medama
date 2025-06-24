@@ -1,3 +1,4 @@
+import { createJobQueue } from './queue-and-selector-management';
 import { _STATE_ENTRIES_CHANGED } from './selectStateEntriesChanged';
 export const createStateImage = (initState) => {
     let calculationAllowed = false;
@@ -19,7 +20,7 @@ export const createStateImage = (initState) => {
         return toReturn;
     };
     const triggerJobStore = Object.create(null);
-    const { addToQueue, runQueue } = createJobQueue();
+    const { addToQueue, processQueue, resetQueue } = createJobQueue();
     const createKeyHandleRecord = () => {
         const immediateTaskSet = new Set();
         const triggerSet = new Set();
@@ -35,7 +36,9 @@ export const createStateImage = (initState) => {
             immediateTaskSet.forEach((task) => {
                 task();
             });
-            addToQueue(triggerSet);
+            triggerSet.forEach((trigger) => {
+                addToQueue(trigger);
+            });
         };
         return { keyHandle, fireKey };
     };
@@ -49,7 +52,7 @@ export const createStateImage = (initState) => {
                 (state[_STATE_ENTRIES_CHANGED] = stateEntriesChanged);
             return mergeToState;
         });
-        runQueue();
+        processQueue();
         return toReturn;
     };
     const proxyHandler = {
@@ -79,21 +82,6 @@ export const createStateImage = (initState) => {
     };
     const stateTargetObject = Object.defineProperty(Object.assign(Object.create(null), initState), _STATE_ENTRIES_CHANGED, { value: Object.create(null), writable: true });
     const state = new Proxy(stateTargetObject, proxyHandler);
-    return { runOverState, setState };
-};
-export const createJobQueue = () => {
-    let queue = [];
-    const addToQueue = (triggerSet) => {
-        triggerSet.forEach(({ trigger, isToAdd }) => {
-            isToAdd() && queue.push(trigger);
-        });
-    };
-    const runQueue = () => {
-        queue.forEach((trigger) => {
-            trigger();
-        });
-        queue = [];
-    };
-    return { addToQueue, runQueue };
+    return { runOverState, setState, resetQueue };
 };
 //# sourceMappingURL=state.js.map

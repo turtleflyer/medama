@@ -1,9 +1,16 @@
+import { createSelectorRecord, } from './queue-and-selector-management';
 export const createSelectorStore = (runOverState) => {
     const selectorSubscriptionStore = new WeakMap();
     const getSelectorRecord = (selector) => {
-        var _a;
-        const selectorRecord = (_a = selectorSubscriptionStore.get(selector)) !== null && _a !== void 0 ? _a : createSelectorRecord(selector, runOverState);
-        selectorSubscriptionStore.set(selector, selectorRecord);
+        let selectorRecord;
+        if (!selectorSubscriptionStore.has(selector)) {
+            const { calculateValue, manageSubscriptions, unsubscribe } = createSubscriptionManagementForSelector(selector, runOverState);
+            selectorRecord = createSelectorRecord(calculateValue, manageSubscriptions, unsubscribe);
+            selectorSubscriptionStore.set(selector, selectorRecord);
+        }
+        else {
+            selectorRecord = selectorSubscriptionStore.get(selector);
+        }
         return selectorRecord;
     };
     const getSelectorValue = (selector) => {
@@ -41,76 +48,27 @@ export const createSelectorStore = (runOverState) => {
     };
     return { getSelectorValue, subscribeToStateInSelectorStore };
 };
-export const createSelectorRecord = (selector, runOverState) => {
-    const unregisterTriggerHandleCallbacks = new Set();
-    let isRegistered = false;
-    const unregisterTrigger = () => {
-        if (!isRegistered)
-            return;
-        unregisterTriggerHandleCallbacks.forEach((callback) => {
-            callback();
-        });
-        isRegistered = false;
-    };
-    const collectedKeyHandles = new Set();
+const createSubscriptionManagementForSelector = (selector, runOverState) => {
+    let collectedKeyHandles;
+    let unsubscribeChunks;
     const keyHandleCollector = (keyHandle) => {
+        collectedKeyHandles !== null && collectedKeyHandles !== void 0 ? collectedKeyHandles : (collectedKeyHandles = new Set());
         collectedKeyHandles.add(keyHandle);
     };
-    let memValue;
-    let isToRecalculateValue = false;
-    const runSelectorWithMemoization = () => {
-        if (isToRecalculateValue) {
-            memValue = runOverState(selector);
-            isToRecalculateValue = false;
-        }
-    };
-    let isToAddValue = false;
-    const immediateTask = () => {
-        if (isToRecalculateValue)
-            return;
-        isToRecalculateValue = true;
-        isToAddValue = true;
-    };
-    const jobs = new Set();
-    const selectorTrigger = {
-        trigger: () => {
-            if (jobs.size === 0) {
-                unregisterTrigger();
-                return;
-            }
-            runSelectorWithMemoization();
-            jobs.forEach((job) => {
-                job(memValue);
-            });
-        },
-        isToAdd: () => {
-            const toReturn = isToAddValue;
-            isToAddValue = false;
-            return toReturn;
-        },
-    };
-    const registerTrigger = (isToPopulateUnregisterCallbacks = false) => {
-        if (isRegistered)
-            return;
-        collectedKeyHandles.forEach((handle) => {
-            const callback = handle(immediateTask, selectorTrigger);
-            isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
+    const calculateValue = () => runOverState(selector, collectedKeyHandles ? undefined : keyHandleCollector);
+    const manageSubscriptions = (immediateTask, selectorTrigger) => {
+        const unsubscribeChunksIsToPopulate = !unsubscribeChunks;
+        unsubscribeChunks !== null && unsubscribeChunks !== void 0 ? unsubscribeChunks : (unsubscribeChunks = []);
+        collectedKeyHandles === null || collectedKeyHandles === void 0 ? void 0 : collectedKeyHandles.forEach((handle) => {
+            const unsubscribeCallback = handle(immediateTask, selectorTrigger);
+            unsubscribeChunksIsToPopulate && (unsubscribeChunks === null || unsubscribeChunks === void 0 ? void 0 : unsubscribeChunks.push(unsubscribeCallback));
         });
-        isRegistered = true;
     };
-    const addSubscription = (subscriptionJob) => {
-        jobs.add(subscriptionJob);
-        return () => {
-            jobs.delete(subscriptionJob);
-        };
+    const unsubscribe = () => {
+        unsubscribeChunks === null || unsubscribeChunks === void 0 ? void 0 : unsubscribeChunks.forEach((unsubscribe) => {
+            unsubscribe();
+        });
     };
-    const getValue = () => {
-        runSelectorWithMemoization();
-        registerTrigger();
-        return memValue;
-    };
-    memValue = runOverState(selector, keyHandleCollector);
-    registerTrigger(true);
-    return { addSubscription, getValue };
+    return { calculateValue, manageSubscriptions, unsubscribe };
 };
 //# sourceMappingURL=selectorStore.js.map

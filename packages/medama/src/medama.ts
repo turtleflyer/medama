@@ -13,38 +13,21 @@ import { createSelectorStore } from './selectorStore';
 import { createStateImage } from './state';
 
 /**
- * Factory function type for creating medama instances.
- * Supports both complete and partial initial state.
- * Returns normalized medama instance with pupil reference.
+ * Factory function type for creating medama instances. Supports both complete
+ * and partial initial state. Returns normalized medama instance with pupil
+ * reference.
  */
 export const createMedama: CreateMedama = <State extends object>(initState?: Partial<State>) => {
   let state = createStateImage(initState);
   let selectorStore = createSelectorStore(state.runOverState);
 
   /**
-   * Flag to prevent state updates during subscription setup. True while
-   * subscription is being configured. Used to throw error if state update is
-   * attempted during subscription.
-   */
-  let flagSubscriptionInProgress = false;
-
-  /**
-   * Flag to prevent recursive state updates from subscription jobs. True while
-   * state update is in progress. Used to throw error if subscription job
-   * attempts state update.
-   */
-  let flagStateUpdating = false;
-
-  /**
-   * Resets state management flags to their initial values. Called during error
-   * handling to ensure clean state after:
-   * - Failed subscription setup
-   * - Failed state updates
-   * - Failed state reads
+   * Resets the job queue to a clean state. Called during error handling when
+   * state updates fail, since failed updates may leave the queue in an
+   * unhealthy state.
    */
   const resetInit = (): void => {
-    flagSubscriptionInProgress = false;
-    flagStateUpdating = false;
+    state.resetQueue();
   };
 
   const subscribeToState: SubscribeToState<State> = <V>(
@@ -52,9 +35,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
     subscription: Subscription<V>
   ): SubscriptionMethods<State, V> => {
     try {
-      flagSubscriptionInProgress = true;
       const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
-      flagSubscriptionInProgress = false;
 
       return toReturn;
     } catch (e) {
@@ -76,15 +57,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
 
   const setState: SetState<State> = (stateChange) => {
     try {
-      if (flagSubscriptionInProgress)
-        throw new Error('Medama Error: The state update occurs during a subscription');
-
-      if (flagStateUpdating)
-        throw new Error('Medama Error: A subscription job launches the state update');
-
-      flagStateUpdating = true;
       const toReturn = state.setState(stateChange);
-      flagStateUpdating = false;
 
       return toReturn;
     } catch (e) {

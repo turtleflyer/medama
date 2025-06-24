@@ -9,6 +9,13 @@ import {
   type TransferSubscription,
   type UnsubscribeFromState,
 } from 'medama';
+import {
+  createJobQueue,
+  createSelectorRecord,
+  type ManageSubscriptions,
+  type SelectorRecord,
+  type SelectorTrigger,
+} from 'medama/queue-and-selector-management';
 import type {
   CStateG,
   CompositeState,
@@ -19,7 +26,6 @@ import type {
 import type { ComposeMedama, CompositeMedama, IsComposite } from './composeMedama.types';
 import { _COMPOSITE_STATE_SIGNATURE, _RELAY_SUBSCRIPTION_MEANS } from './const';
 import { forEachOnOwnNumerableProps } from './forEachOnOwnNumerableProps';
-import { createJobQueue, type SelectorTrigger } from './jobQueue';
 import {
   createReadWorkModeManager,
   createUpdateWorkModeManager,
@@ -33,13 +39,8 @@ import { traverseThroughPupils, type ProcessLayer } from './traverseThroughPupil
  * coordination. These managers control concurrent access patterns and
  * subscription handling. See modeManager.ts for detailed implementation.
  */
-const {
-  getReadWorkState,
-  runWithReadModeOn,
-  setSubscriptionMeansRequested,
-  getRequestSubscriptionMeansState,
-  resetReadWorkMode,
-} = createReadWorkModeManager();
+const { runWithSubscriptionMeansRequested, getRequestSubscriptionMeansState, resetReadWorkMode } =
+  createReadWorkModeManager();
 
 const {
   getUpdateWorkState,
@@ -146,11 +147,12 @@ export const composeMedama = (<State extends CStateG>(
        *   relay subscription means up the chain through the
        *   _RELAY_SUBSCRIPTION_MEANS state property
        */
-      const isInitiator = !getReadWorkState();
+      const isInitiator = !getRequestSubscriptionMeansState();
 
       /**
        * Calculates the result for compositeSelector by:
-       * 1. Traversing through all nested states to build a combined state object
+       * 1. Traversing through all nested states to build a combined state
+       *    object
        * 2. Optionally collecting and combining subscription means from nested
        *    layers to propagate them up the chain
        * 3. Applying the compositeSelector to the final combined state
@@ -179,10 +181,26 @@ export const composeMedama = (<State extends CStateG>(
        * states use their selectors only once and don't need memoization.
        */
       if (isInitiator) {
+        let subscribeMethodsCached: SubscribeToLayerWithSelector[] | undefined;
+
+        const getSubscribeMethods: GetSubscribeMethods = () => {
+          subscribeMethodsCached ??= getSubscriptionMeans()?.map(
+            ({ subscribeToLayer, layerSelector }) =>
+              getSubscribeToLayerWithSelector(subscribeToLayer, layerSelector)
+          );
+
+          return subscribeMethodsCached;
+        };
+
+        const { manageSubscriptions, unsubscribe } = createSubscriptionManagementForSelector(
+          addToStateQueueAndSubscribe,
+          getSubscribeMethods
+        );
+
         const selectorRecord = createSelectorRecord(
           calculateResultFromLayers,
-          addToStateQueueAndSubscribe,
-          getSubscriptionMeans
+          manageSubscriptions,
+          unsubscribe
         );
 
         /**
@@ -191,10 +209,9 @@ export const composeMedama = (<State extends CStateG>(
          * rebuilding subscription chains on subsequent reads.
          */
         selectorStore.set(compositeSelector, selectorRecord);
-        setSubscriptionMeansRequested();
         const { getValue } = selectorRecord;
 
-        return getValue();
+        return runWithSubscriptionMeansRequested(getValue);
       }
 
       return calculateResultFromLayers();
@@ -388,9 +405,9 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
       Object.create(null) as State,
       _COMPOSITE_STATE_SIGNATURE,
       {
-        // Special key used to distinguish composite states from root states. This
-        // allows selectors to handle state objects differently based on their
-        // origin
+        // Special key used to distinguish composite states from root states.
+        // This allows selectors to handle state objects differently based on
+        // their origin
         value: true,
       }
     )
@@ -420,185 +437,63 @@ const createLayerProcessorWithSubscriptionMeans = <State extends CStateG>(): {
   return { processLayer, getSubscriptionMeans };
 };
 
-/**
- * Adds subscription job to run when selector value changes. Returns cleanup
- * function to remove subscription.
- *
- * @template V The type of the selector value
- */
-type AddSubscription<V> = (subscriptionJob: SubscriptionJob<V>) => () => void;
+type GetSubscribeMethods = () => SubscribeToLayerWithSelector[] | undefined;
 
 /**
- * Gets memoized selector value, recalculating only if needed. Ensures selector
- * is registered even without active subscriptions.
- *
- * @template V The type of the selector value
+ * Methods for managing subscriptions for a selector, including setup and
+ * teardown.
  */
-type GetValue<V> = () => V;
-
-type SelectorRecord<V> = {
+type SubscriptionManagementMethods = {
   /**
-   * Adds subscription job to run when selector value changes. Returns cleanup
-   * function to remove subscription.
+   * Sets up subscriptions for all layers using the provided subscribe methods.
+   * Each subscription will trigger the provided immediateTask and
+   * selectorTrigger.
    */
-  addSubscription: AddSubscription<V>;
+  manageSubscriptions: ManageSubscriptions;
 
   /**
-   * Gets memoized selector value, recalculating only if needed. Ensures
-   * selector is registered even without active subscriptions.
+   * Unsubscribes from all subscriptions created for this selector.
    */
-  getValue: GetValue<V>;
+  unsubscribe: () => void;
 };
 
 /**
- * Creates a record to manage selector value calculation and subscriptions.
- * Handles:
- * - Lazy calculation of selector value with memoization
- * - Subscription management for state changes
- * - Automatic cleanup when no subscriptions remain
+ * Creates subscription management helpers for a selector, allowing setup and
+ * teardown of subscriptions across all relevant layers. Handles subscription
+ * chaining and cleanup.
  *
- * @param calculateResult Function to compute selector value
- * @param addToStateQueueAndSubscribeOrRun Function to handle state updates
- * @param getSubscriptionMeans Function to get subscription methods
- * @returns Record with methods for value retrieval and subscription management
+ * @param addToStateQueueAndSubscribe Function to defer selector triggers.
+ * @param getSubscribeMethods Function to retrieve all subscribe methods for the
+ * selector.
+ * @returns SubscriptionManagementMethods for managing and cleaning up
+ * subscriptions.
  */
-const createSelectorRecord = <V>(
-  calculateResult: () => V,
-  addToStateQueueAndSubscribeOrRun: Defer<SelectorTrigger>,
-  getSubscriptionMeans: GetSubscriptionMeans
-): SelectorRecord<V> => {
-  /**
-   * Function to unsubscribe from all nested layer subscriptions
-   */
-  let unsubscribePoolFromLayers: () => void;
+const createSubscriptionManagementForSelector = (
+  addToStateQueueAndSubscribe: Defer<SelectorTrigger>,
+  getSubscribeMethods: GetSubscribeMethods
+): SubscriptionManagementMethods => {
+  let unsubscribeChunks: UnsubscribeFromState[] | undefined;
 
-  /**
-   * Indicates if the selector is currently registered with subscriptions
-   */
-  let isRegistered = false;
-
-  /**
-   * Memoized selector result value
-   */
-  let memValue: V;
-
-  /**
-   * Flag indicating if selector value needs recalculation
-   */
-  let isToRecalculateValue = true;
-
-  /**
-   * Recalculates selector value only if dependencies have changed. Runs
-   * calculation in read mode to ensure proper dependency tracking.
-   */
-  const runSelectorWithMemoization = (): void => {
-    if (isToRecalculateValue) {
-      runWithReadModeOn(() => {
-        memValue = calculateResult();
-      });
-
-      isToRecalculateValue = false;
-    }
-  };
-
-  let isToAddValue = false;
-
-  /**
-   * Marks the selector as needing recalculation.
-   * This is called when a dependency in a nested layer changes, ensuring that
-   * the selector value will be recomputed the next time it is accessed or when a trigger fires.
-   */
-  const immediateTask = () => {
-    if (isToRecalculateValue) return;
-
-    isToRecalculateValue = true;
-    isToAddValue = true;
-  };
-
-  /**
-   * Collection of subscription jobs that run when selector value changes
-   */
-  const jobs = new Set<SubscriptionJob<V>>();
-
-  const selectorTrigger: SelectorTrigger = {
-    /**
-     * Triggered when selector dependencies change. Handles recalculation and
-     * subscription notifications. Cleans up when no subscriptions remain.
-     */
-    trigger: (): void => {
-      if (jobs.size === 0) {
-        unsubscribePoolFromLayers();
-
-        return;
-      }
-
-      runSelectorWithMemoization();
-
-      jobs.forEach((job): void => {
-        job(memValue);
-      });
-    },
-
-    isToAdd: (): boolean => {
-      const toReturn = isToAddValue;
-      isToAddValue = false;
-
-      return toReturn;
-    },
-  };
-
-  let subscribeMethodsCached: SubscribeToLayerWithSelector[] | undefined = undefined;
-
-  /**
-   * Registers selector's subscriptions with nested layers. Creates combined
-   * subscription from all layer subscriptions. Prevents duplicate registrations
-   * via isRegistered flag.
-   */
-  const registerTrigger = (): void => {
-    if (isRegistered) return;
-
+  const manageSubscriptions: ManageSubscriptions = (immediateTask, selectorTrigger) => {
     const layerTriggerSubscription = () => {
-      addToStateQueueAndSubscribeOrRun(immediateTask, selectorTrigger);
+      addToStateQueueAndSubscribe(immediateTask, selectorTrigger);
     };
 
-    subscribeMethodsCached ??= getSubscriptionMeans()?.map(({ subscribeToLayer, layerSelector }) =>
-      getSubscribeToLayerWithSelector(subscribeToLayer, layerSelector)
+    unsubscribeChunks = getSubscribeMethods()?.map((subscribeToLayerWithSelector) =>
+      subscribeToLayerWithSelector(layerTriggerSubscription)
     );
-
-    const unsubscribeChunks =
-      subscribeMethodsCached?.map((subscribeToLayerWithSelector) =>
-        subscribeToLayerWithSelector(layerTriggerSubscription)
-      ) ?? [];
-
-    unsubscribePoolFromLayers = (): void => {
-      if (!isRegistered) return;
-
-      unsubscribeChunks.forEach((unsubscribe): void => {
-        unsubscribe();
-      });
-
-      isRegistered = false;
-    };
-
-    isRegistered = true;
   };
 
-  const getValue: GetValue<V> = () => {
-    runSelectorWithMemoization();
-    registerTrigger();
-
-    return memValue;
+  /**
+   * Unsubscribes from all subscriptions created for this selector.
+   */
+  const unsubscribe = () => {
+    unsubscribeChunks?.forEach((unsubscribe): void => {
+      unsubscribe();
+    });
   };
 
-  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
-    jobs.add(subscriptionJob);
-
-    return () => {
-      jobs.delete(subscriptionJob);
-    };
-  };
-
-  return { addSubscription, getValue };
+  return { manageSubscriptions, unsubscribe };
 };
 
 /**

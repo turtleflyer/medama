@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { createMedama } from 'medama';
-import type { ComposeMedama, CompositePupil, IsComposite } from '..';
+import type { ComposeMedama, CompositePupil, CompositeState, IsComposite } from '..';
 import type {
   CStateG,
   LayerPupilsPreventInference,
@@ -2613,7 +2613,7 @@ export const compositeMedamaWithNestedLayers = (
 
       type State = typeof pupil extends CompositePupil<infer S> ? S : never;
 
-      const levelDown = <L extends object>(layer: L): L =>
+      const levelDown = <L extends CompositeState<{}>>(layer: L): L =>
         Object.fromEntries(
           (Reflect.ownKeys(layer) as (keyof L)[])
             .filter(Object.prototype.propertyIsEnumerable.bind(layer))
@@ -2628,7 +2628,7 @@ export const compositeMedamaWithNestedLayers = (
             ])
         ) as L;
 
-      const selector = (state: State) => levelDown(state);
+      const selector = (state: CompositeState<State>) => levelDown(state);
 
       expect(readState(selector)).toEqual({
         a: {

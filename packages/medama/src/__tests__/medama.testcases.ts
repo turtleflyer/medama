@@ -1824,32 +1824,6 @@ export const medamaTest = (
       expect(selector).toHaveBeenCalledTimes(1);
     });
 
-    test('dangerous state updates prohibited during subscription or inside subscription job', () => {
-      const { setState, subscribeToState } = createMedama({ a: 1, b: 10 });
-
-      expect(() =>
-        subscribeToState(
-          ({ a }) => a,
-
-          () => {
-            setState({ a: 2 });
-          }
-        )
-      ).toThrow('Medama Error: The state update occurs during a subscription');
-
-      subscribeToState(
-        ({ b }) => b,
-
-        () => () => {
-          setState({ b: 20 });
-        }
-      );
-
-      expect(() => setState({ b: 30 })).toThrow(
-        'Medama Error: A subscription job launches the state update'
-      );
-    });
-
     test('selector remember its dependent state keys', () => {
       type State = { a: number; b: number };
 

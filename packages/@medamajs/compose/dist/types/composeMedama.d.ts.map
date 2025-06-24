@@ -1,1 +1,1 @@
-{"version":3,"file":"composeMedama.d.ts","sourceRoot":"","sources":["../../src/composeMedama.ts"],"names":[],"mappings":"AAkBA,OAAO,KAAK,EAAE,aAAa,EAAmB,WAAW,EAAE,MAAM,uBAAuB,CAAC;AAyDzF,eAAO,MAAM,aAAa,EA+QpB,aAAa,CAAC;AA4QpB,eAAO,MAAM,WAAW,EAAE,WAGW,CAAC"}
+{"version":3,"file":"composeMedama.d.ts","sourceRoot":"","sources":["../../src/composeMedama.ts"],"names":[],"mappings":"AAyBA,OAAO,KAAK,EAAE,aAAa,EAAmB,WAAW,EAAE,MAAM,uBAAuB,CAAC;AAmDzF,eAAO,MAAM,aAAa,EA+RpB,aAAa,CAAC;AAkJpB,eAAO,MAAM,WAAW,EAAE,WAGW,CAAC"}

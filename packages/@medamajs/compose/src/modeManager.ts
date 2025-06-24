@@ -7,34 +7,22 @@ import {
 } from 'medama';
 
 /**
- * Function to execute job with read mode enabled. Sets read work state to true
- * before execution, resets both read work and subscription means states after
- * completion.
+ * Runs the given job with subscription means collection enabled for the
+ * duration of the job. Ensures that nested composite states collect and relay
+ * subscription means up the chain.
  *
- * @param job Function to execute in read mode
+ * @param job Function to execute with subscription means collection enabled
+ * @returns The return value of the executed job
  */
-type RunWithReadModeOn = (job: () => void) => void;
+type RunWithSubscriptionMeansRequested = <V>(job: () => V) => V;
 
 type ReadWorkModeMethods = {
   /**
-   * Returns current read work state. True indicates that reading process is in
-   * progress and any nested reads should be treated as derivative calls rather
-   * than initiator calls.
+   * Runs the given job with subscription means collection enabled for the
+   * duration of the job. Ensures that nested composite states collect and relay
+   * subscription means up the chain.
    */
-  getReadWorkState: () => boolean;
-
-  /**
-   * Function to execute job with read mode enabled. Sets read work state to
-   * true before execution, resets both read work and subscription means states
-   * after completion.
-   */
-  runWithReadModeOn: RunWithReadModeOn;
-
-  /**
-   * Sets subscription means requested state to true. Indicates that nested
-   * composite states should collect and relay subscription means up the chain.
-   */
-  setSubscriptionMeansRequested: () => void;
+  runWithSubscriptionMeansRequested: RunWithSubscriptionMeansRequested;
 
   /**
    * Returns current subscription means requested state. True indicates that
@@ -44,54 +32,37 @@ type ReadWorkModeMethods = {
   getRequestSubscriptionMeansState: () => boolean;
 
   /**
-   * Resets both read work state and subscription means requested state to
-   * false. Used during initialization and error handling to ensure clean state.
+   * Resets subscription means requested state to false. Used during
+   * initialization and error handling to ensure clean state.
    */
   resetReadWorkMode: () => void;
 };
 
 /**
- * Creates a manager to control read work mode and subscription collection
- * state. Manages two key states:
- * - Read work state: Tracks if reading process is active
- * - Subscription means state: Controls if nested states should collect
- *   subscriptions
- *
- * Provides methods to:
- * - Start/finish reading operations
- * - Control subscription means collection
- * - Reset states during initialization or error handling
- *
- * @returns Object containing methods to manage read work mode
+ * Creates a manager to control subscription means collection mode, which
+ * controls if nested states should collect subscriptions. Provides methods to
+ * control subscription means collection and reset state during initialization
+ * or error handling.
  */
 export const createReadWorkModeManager = (): ReadWorkModeMethods => {
-  let readWorkState = false;
   let requestSubscriptionMeansState = false;
 
-  const getReadWorkState = (): boolean => readWorkState;
-
-  const runWithReadModeOn = (job: () => void): void => {
-    readWorkState = true;
-    job();
-    readWorkState = false;
-    requestSubscriptionMeansState = false;
-  };
-
-  const setSubscriptionMeansRequested = (): void => {
+  const runWithSubscriptionMeansRequested: RunWithSubscriptionMeansRequested = (job) => {
     requestSubscriptionMeansState = true;
+    const toReturn = job();
+    requestSubscriptionMeansState = false;
+
+    return toReturn;
   };
 
   const getRequestSubscriptionMeansState = (): boolean => requestSubscriptionMeansState;
 
   const resetReadWorkMode = (): void => {
-    readWorkState = false;
     requestSubscriptionMeansState = false;
   };
 
   return {
-    getReadWorkState,
-    runWithReadModeOn,
-    setSubscriptionMeansRequested,
+    runWithSubscriptionMeansRequested,
     getRequestSubscriptionMeansState,
     resetReadWorkMode,
   };
@@ -120,16 +91,32 @@ type DeferrerMethods<Job> = {
   reset: Reset;
 };
 
+/**
+ * Creates a handler that defers jobs. Provides subscription mechanism to
+ * resolve deferred jobs when signaled.
+ *
+ * @param deferJob Function to add a job to the deferred queue
+ * @param resolveDeferred Function to process all deferred jobs when signaled
+ * @returns An object with methods to defer jobs and reset subscription state
+ */
 type CreateDeferrer = <Job>(
   deferJob: (job: Job) => void,
   resolveDeferred: () => void
 ) => DeferrerMethods<Job>;
 
+/**
+ * Subscribes to a layer's state changes using a selector, with signal
+ * management for deferred job resolution.
+ *
+ * @param subscription Callback to execute when the selected state changes
+ * @returns Unsubscribe function for the subscription
+ */
 export type SubscribeToLayerWithSelector = (subscription: () => void) => UnsubscribeFromState;
 
 /**
- * Returns a function that subscribes to a layer's state changes with a selector,
- * ensuring signal management for deferred job resolution. Handles subscription record caching.
+ * Returns a function that subscribes to a layer's state changes with a
+ * selector, ensuring signal management for deferred job resolution. Handles
+ * subscription record caching.
  *
  * @param subscribeToLayer The layer's subscribe function
  * @param selector Selector for the layer's state
@@ -162,19 +149,13 @@ type UpdateWorkModeMethods = {
   /**
    * Creates a handler that defers jobs. Provides subscription mechanism to
    * resolve deferred jobs when signaled.
-   *
-   * @param deferJob Function to add job to deferred queue
-   * @param resolveDeferred Function to process deferred queue
    */
   createDeferrer: CreateDeferrer;
 
   /**
-   * Returns a function that subscribes to a layer's state changes with a selector,
-   * ensuring signal management for deferred job resolution. Handles subscription record caching.
-   *
-   * @param subscribeToLayer The layer's subscribe function
-   * @param selector Selector for the layer's state
-   * @returns Function to subscribe with signal management
+   * Returns a function that subscribes to a layer's state changes with a
+   * selector, ensuring signal management for deferred job resolution. Handles
+   * subscription record caching.
    */
   getSubscribeToLayerWithSelector: GetSubscribeToLayerWithSelector;
 
@@ -190,8 +171,9 @@ type SignalToResolveDeferredJobsState = {
 };
 
 /**
- * Subscribes to both the layer's state changes and the signal for resolving deferred jobs.
- * Ensures that job counting and signal subscription are managed correctly for the layer.
+ * Subscribes to both the layer's state changes and the signal for resolving
+ * deferred jobs. Ensures that job counting and signal subscription are managed
+ * correctly for the layer.
  *
  * @param selector Selector for the layer's state
  * @param subscription Callback to execute when the layer's state changes
@@ -204,12 +186,9 @@ type SubscribeAndManageDeferring = (
 
 type LayerSubscriptionRecord = {
   /**
-   * Subscribes to both the layer's state changes and the signal for resolving deferred jobs.
-   * Ensures that job counting and signal subscription are managed correctly for the layer.
-   *
-   * @param selector Selector for the layer's state
-   * @param subscription Callback to execute when the layer's state changes
-   * @returns Unsubscribe function for the subscription
+   * Subscribes to both the layer's state changes and the signal for resolving
+   * deferred jobs. Ensures that job counting and signal subscription are
+   * managed correctly for the layer.
    */
   subscribeAndManageDeferring: SubscribeAndManageDeferring;
 };
@@ -218,19 +197,23 @@ type LayerSubscriptionRecord = {
  * Creates a manager to control update work mode and deferred job handling. This
  * manager is responsible for:
  * - Tracking whether an update process is currently active (update work state)
- * - Deferring jobs when updates are in progress, and executing them when signaled
+ * - Deferring jobs when updates are in progress, and executing them when
+ *   signaled
  * - Providing a mechanism to signal when deferred jobs should be resolved
- * - Creating deferrer instances that handle job execution timing based on a signal
- * - Managing subscriptions for state changes and deferred job resolution using medama state
+ * - Creating deferrer instances that handle job execution timing based on a
+ *   signal
+ * - Managing subscriptions for state changes and deferred job resolution using
+ *   medama state
  *
- * @returns Object containing methods to manage update work mode, job deferral, and signal-based resolution
+ * @returns Object containing methods to manage update work mode, job deferral,
+ * and signal-based resolution
  */
 export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
   let updateWorkState = false;
 
   /**
-   * Stores a mapping from a subscribeToLayer function to its layer subscription record.
-   * Used to manage subscriptions for each layer independently.
+   * Stores a mapping from a subscribeToLayer function to its layer subscription
+   * record. Used to manage subscriptions for each layer independently.
    */
   const layerSubscriptionStore = new WeakMap<SubscribeToState<{}>, LayerSubscriptionRecord>();
 
@@ -289,8 +272,9 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
   };
 
   /**
-   * Creates a subscription record for managing signal-based job resolution for a given layer.
-   * Handles subscription lifecycle and job counting for deferred job signaling.
+   * Creates a subscription record for managing signal-based job resolution for
+   * a given layer. Handles subscription lifecycle and job counting for deferred
+   * job signaling.
    */
   const createLayerSubscriptionRecord = (
     subscribeToLayer: SubscribeToState<{}>

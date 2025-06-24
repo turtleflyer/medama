@@ -6,6 +6,9 @@ const config: Config = {
 
   moduleNameMapper: {
     '^medama$': '<rootDir>/../../medama/src',
+
+    '^medama/queue-and-selector-management$':
+      '<rootDir>/../../medama/src/queue-and-selector-management',
   },
 };
 

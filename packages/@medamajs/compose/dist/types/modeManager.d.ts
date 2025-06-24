@@ -1,9 +1,7 @@
 import { type Selector, type SubscribeToState, type UnsubscribeFromState } from 'medama';
-type RunWithReadModeOn = (job: () => void) => void;
+type RunWithSubscriptionMeansRequested = <V>(job: () => V) => V;
 type ReadWorkModeMethods = {
-    getReadWorkState: () => boolean;
-    runWithReadModeOn: RunWithReadModeOn;
-    setSubscriptionMeansRequested: () => void;
+    runWithSubscriptionMeansRequested: RunWithSubscriptionMeansRequested;
     getRequestSubscriptionMeansState: () => boolean;
     resetReadWorkMode: () => void;
 };

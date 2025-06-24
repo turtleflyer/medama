@@ -7,31 +7,40 @@ import type {
   TransferSubscription,
   UnsubscribeFromState,
 } from './medama.types';
+import {
+  createSelectorRecord,
+  type CalculateValue,
+  type ManageSubscriptions,
+  type SelectorRecord,
+  type SelectorTrigger,
+} from './queue-and-selector-management';
 import type { KeyHandle, KeyHandleCollector, RunOverState } from './state';
 
+/**
+ * Gets current value for given selector. Retrieves or creates selector record
+ * from store and returns its memoized value. Value is recalculated only if
+ * selector's dependencies have changed.
+ *
+ * @param selector Selector to get value for
+ * @returns Current value for selector
+ */
 type GetSelectorValue<State extends object> = <V>(selector: Selector<State, V>) => V;
 
+/**
+ * Creates subscription to selector value changes.
+ * - Gets or creates selector record from store
+ * - Evaluates initial subscription with current value
+ * - Sets up subscription job for future value changes
+ * - Returns methods to unsubscribe or resubscribe with new subscription
+ *
+ * @param selector Selector to subscribe to
+ * @param subscription Subscription function to run on value changes
+ * @returns Object with unsubscribe and resubscribe methods
+ */
 type SubscribeToStateInSelectorStore<State extends object> = <V>(
   selector: Selector<State, V>,
   subscription: Subscription<V>
 ) => SubscriptionMethods<State, V>;
-
-export type SelectorTrigger = {
-  /**
-   * Method to trigger the selector's functionality.
-   * This is called when the selector's dependencies change, ensuring that
-   * the selector's value is recalculated and all active subscription jobs
-   * are notified with the updated value.
-   */
-  trigger: () => void;
-
-  /**
-   * Method to check if the selector's trigger should be added to the queue.
-   * Ensures that the selector's trigger is not added to the queue multiple times.
-   * Returns a boolean indicating whether the selector's trigger has already been added.
-   */
-  isToAdd: () => boolean;
-};
 
 /**
  * Creates a store to manage selectors and their associated records. Each
@@ -46,7 +55,7 @@ export type SelectorTrigger = {
  * @returns Methods for getting selector values and managing subscriptions
  */
 export const createSelectorStore = <State extends object>(
-  runOverState: RunOverState<State, unknown>
+  runOverState: RunOverState<State>
 ): {
   getSelectorValue: GetSelectorValue<State>;
   subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State>;
@@ -57,54 +66,38 @@ export const createSelectorStore = <State extends object>(
   >();
 
   /**
-   * Gets or creates a record for given selector from WeakMap store. Record
-   * contains methods to:
-   * - Get memoized selector value
-   * - Add subscription to selector value changes
+   * Gets or creates a record for given selector from WeakMap store.
    *
    * @param selector Selector to get/create record for
    * @returns Record containing selector's value and subscription management
    * methods
    */
   const getSelectorRecord = <V>(selector: Selector<State, V>): SelectorRecord<V> => {
-    const selectorRecord =
-      (selectorSubscriptionStore.get(selector) as SelectorRecord<V>) ??
-      createSelectorRecord(selector, runOverState);
+    let selectorRecord: SelectorRecord<V>;
 
-    selectorSubscriptionStore.set(selector, selectorRecord);
+    if (!selectorSubscriptionStore.has(selector)) {
+      const { calculateValue, manageSubscriptions, unsubscribe } =
+        createSubscriptionManagementForSelector(selector, runOverState);
+
+      selectorRecord = createSelectorRecord(calculateValue, manageSubscriptions, unsubscribe);
+      selectorSubscriptionStore.set(selector, selectorRecord);
+    } else {
+      selectorRecord = selectorSubscriptionStore.get(selector) as SelectorRecord<V>;
+    }
 
     return selectorRecord;
   };
 
-  /**
-   * Gets current value for given selector. Retrieves or creates selector record
-   * from store and returns its memoized value. Value is recalculated only if
-   * selector's dependencies have changed.
-   *
-   * @param selector Selector to get value for
-   * @returns Current value for selector
-   */
   const getSelectorValue: GetSelectorValue<State> = (selector) => {
     const { getValue } = getSelectorRecord(selector);
 
     return getValue();
   };
 
-  /**
-   * Creates subscription to selector value changes.
-   * - Gets or creates selector record from store
-   * - Evaluates initial subscription with current value
-   * - Sets up subscription job for future value changes
-   * - Returns methods to unsubscribe or resubscribe with new subscription
-   *
-   * @param selector Selector to subscribe to
-   * @param subscription Subscription function to run on value changes
-   * @returns Object with unsubscribe and resubscribe methods
-   */
   const subscribeToStateInSelectorStore: SubscribeToStateInSelectorStore<State> = <V>(
     selector: Selector<State, V>,
     subscription: Subscription<V>
-  ): SubscriptionMethods<State, V> => {
+  ) => {
     let currentSelector = selector;
     let unsubscribeHandle: UnsubscribeFromState | null = null;
     let currentRevealedSubscriptionJob: SubscriptionJob<V>;
@@ -145,206 +138,80 @@ export const createSelectorStore = <State extends object>(
   return { getSelectorValue, subscribeToStateInSelectorStore };
 };
 
-type AddSubscription<V> = (subscriptionJob: SubscriptionJob<V>) => () => void;
+/**
+ * Methods for managing a selector's value calculation, subscription management,
+ * and cleanup. Used as the return type for
+ * createSubscriptionManagementForSelector.
+ */
+type SubscriptionManagementMethods<V> = {
+  /**
+   * Function to calculate the selector's value.
+   */
+  calculateValue: CalculateValue<V>;
 
-type GetValue<V> = () => V;
+  /**
+   * Function to manage subscriptions for the selector. Receives immediateTask
+   * (to mark the selector as needing recalculation) and selectorTrigger (to
+   * control when jobs are run). Responsible for wiring up and managing the
+   * subscription lifecycle.
+   */
+  manageSubscriptions: ManageSubscriptions;
 
-type SelectorRecord<V> = { addSubscription: AddSubscription<V>; getValue: GetValue<V> };
+  /**
+   * Function to clean up all subscriptions and resources associated with the
+   * selector.
+   */
+  unsubscribe: () => void;
+};
 
 /**
- * Creates a record to manage selector value calculation and subscriptions.
- * Handles:
- * - Lazy calculation of selector value with memoization
- * - Collection and registration of state key dependencies
- * - Subscription management for state changes
- * - Automatic cleanup by unregistering from state key notifications when no
- *   active subscriptions remain, reducing overhead for unused selectors
+ * Creates the methods required to manage a selector's value calculation,
+ * subscriptions, and cleanup.
+ * - Collects key handles for dependency tracking.
+ * - Provides a calculateValue function for selector evaluation.
+ * - Provides a manageSubscriptions function to wire up and manage
+ *   subscriptions.
+ * - Provides an unsubscribe function to clean up all associated resources.
  *
- * @param selector Selector function to create record for
- * @param runOverState Function to execute selector over current state
- * @returns Record with methods for value retrieval and subscription management
+ * @param selector The selector for which to create management methods.
+ * @param runOverState Function to evaluate the selector over the current state.
+ * @returns An object with calculateValue, manageSubscriptions, and unsubscribe
+ * methods.
  */
-export const createSelectorRecord = <State extends object, V>(
+const createSubscriptionManagementForSelector = <State extends object, V>(
   selector: Selector<State, V>,
-  runOverState: RunOverState<State, V>
-): SelectorRecord<V> => {
-  /**
-   * Stores cleanup functions returned by key handles during initial
-   * registration. Used to remove selector trigger from state property
-   * dependencies when needed. Called during unregistration to clean up all
-   * dependency subscriptions.
-   */
-  const unregisterTriggerHandleCallbacks = new Set<() => void>();
+  runOverState: RunOverState<State>
+): SubscriptionManagementMethods<V> => {
+  let collectedKeyHandles: Set<KeyHandle> | undefined;
+  let unsubscribeChunks: UnsubscribeFromState[] | undefined;
 
-  /**
-   * Indicates if the selector is currently registered.
-   */
-  let isRegistered = false;
-
-  /**
-   * Unregisters the selector's trigger from all its dependency key handles.
-   * - Calls all stored cleanup callbacks to remove the selector's trigger from state property dependencies.
-   * - Ensures this operation only runs if the selector is currently registered.
-   * - Marks the selector as unregistered to prevent duplicate cleanup.
-   *
-   * This is used for automatic cleanup when a selector is no longer needed (e.g., no active subscriptions remain),
-   * helping to avoid memory leaks and unnecessary notifications.
-   */
-  const unregisterTrigger = (): void => {
-    if (!isRegistered) return;
-
-    unregisterTriggerHandleCallbacks.forEach((callback) => {
-      callback();
-    });
-
-    isRegistered = false;
-  };
-
-  /**
-   * Stores key handles collected during initial selector execution. Each handle
-   * represents a state property dependency. Used to register/unregister
-   * selector trigger when these dependencies change. Maintained throughout
-   * selector's lifecycle for reregistration.
-   */
-  const collectedKeyHandles = new Set<KeyHandle>();
-
-  /**
-   * Collects key handles during initial selector execution. Each handle
-   * represents state property that selector depends on. Added handles are used
-   * to register/unregister selector trigger when dependencies change.
-   */
   const keyHandleCollector: KeyHandleCollector = (keyHandle) => {
+    collectedKeyHandles ??= new Set();
     collectedKeyHandles.add(keyHandle);
   };
 
-  /**
-   * The result value for the selector is set to be calculated lazily preventing
-   * unnecessary recalculating.
-   */
-  let memValue: V;
-
-  /**
-   * Flag indicating if selector value needs recalculation. Set to true when
-   * dependencies change, reset after recalculation. Used for lazy evaluation to
-   * prevent unnecessary calculations.
-   */
-  let isToRecalculateValue = false;
-
-  /**
-   * Recalculates selector value only if dependencies have changed. Updates
-   * memoized value and resets recalculation flag. Lazy evaluation to prevent
-   * unnecessary calculations.
-   */
-  const runSelectorWithMemoization = (): void => {
-    if (isToRecalculateValue) {
-      memValue = runOverState(selector);
-      isToRecalculateValue = false;
-    }
-  };
-
-  let isToAddValue = false;
-
-  /**
-   * Marks the selector as needing recalculation.
-   * This is called when a dependency property changes, ensuring that the selector value
-   * will be recomputed the next time it is accessed or when a trigger fires.
-   */
-  const immediateTask = () => {
-    if (isToRecalculateValue) return;
-
-    isToRecalculateValue = true;
-    isToAddValue = true;
-  };
-
-  /**
-   * Collection of subscription jobs that run when selector's dependencies
-   * change. When empty, triggers cleanup by unregistering selector from state
-   * updates.
-   */
-  const jobs = new Set<SubscriptionJob<V>>();
-
-  const selectorTrigger: SelectorTrigger = {
+  const calculateValue = () =>
     /**
-     * Triggered when selector's dependencies change. Handles:
-     * - If there are no active jobs (subscriptions), and the selector is
-     *   registered and marked for recalculation, unregisters the selector's
-     *   trigger from all dependencies (cleanup).
-     * - If there are active jobs, recalculates the selector value if needed,
-     *   and notifies all jobs with the new value.
+     * Ensures the key handles are collected and memoized on the first run. On
+     * subsequent runs, uses the memoized set of key handles.
      */
-    trigger: (): void => {
-      if (jobs.size === 0) {
-        // If no subscriptions remain, unregister the selector's trigger for cleanup
-        unregisterTrigger();
+    runOverState(selector, collectedKeyHandles ? undefined : keyHandleCollector);
 
-        return;
-      }
+  const manageSubscriptions = (immediateTask: () => void, selectorTrigger: SelectorTrigger) => {
+    const unsubscribeChunksIsToPopulate = !unsubscribeChunks;
+    unsubscribeChunks ??= [];
 
-      runSelectorWithMemoization();
-
-      jobs.forEach((job): void => {
-        job(memValue);
-      });
-    },
-
-    isToAdd: (): boolean => {
-      const toReturn = isToAddValue;
-      isToAddValue = false;
-
-      return toReturn;
-    },
-  };
-
-  /**
-   * Registers the selector's trigger with all its dependency key handles.
-   * - On initial registration (isToPopulateUnregisterCallbacks = true), stores cleanup callbacks for later unregistration.
-   * - Prevents duplicate registrations using the isRegistered flag.
-   *
-   * @param isToPopulateUnregisterCallbacks Whether to store cleanup callbacks for unregistering later
-   */
-  const registerTrigger = (isToPopulateUnregisterCallbacks = false): void => {
-    if (isRegistered) return;
-
-    collectedKeyHandles.forEach((handle) => {
-      const callback = handle(immediateTask, selectorTrigger);
-
-      isToPopulateUnregisterCallbacks && unregisterTriggerHandleCallbacks.add(callback);
+    collectedKeyHandles?.forEach((handle) => {
+      const unsubscribeCallback = handle(immediateTask, selectorTrigger);
+      unsubscribeChunksIsToPopulate && unsubscribeChunks?.push(unsubscribeCallback);
     });
-
-    isRegistered = true;
   };
 
-  /**
-   * Adds subscription job to run when selector value changes. Jobs are stored
-   * in Set to ensure uniqueness. Returns cleanup function to remove
-   * subscription.
-   *
-   * @param subscriptionJob Function to run when selector value changes
-   * @returns Cleanup function to remove subscription
-   */
-  const addSubscription: AddSubscription<V> = (subscriptionJob) => {
-    jobs.add(subscriptionJob);
-
-    return () => {
-      jobs.delete(subscriptionJob);
-    };
+  const unsubscribe = () => {
+    unsubscribeChunks?.forEach((unsubscribe): void => {
+      unsubscribe();
+    });
   };
 
-  /**
-   * Gets memoized selector value, recalculating only if dependencies changed.
-   * Registers selector even without active subscriptions to ensure proper value
-   * tracking. Unregistration happens on next dependency update if no
-   * subscriptions exist.
-   */
-  const getValue: GetValue<V> = () => {
-    runSelectorWithMemoization();
-    registerTrigger();
-
-    return memValue;
-  };
-
-  memValue = runOverState(selector, keyHandleCollector);
-  registerTrigger(true);
-
-  return { addSubscription, getValue };
+  return { calculateValue, manageSubscriptions, unsubscribe };
 };

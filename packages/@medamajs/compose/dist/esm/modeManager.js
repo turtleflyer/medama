@@ -1,26 +1,18 @@
 import { createMedama, selectStateEntriesChanged, } from 'medama';
 export const createReadWorkModeManager = () => {
-    let readWorkState = false;
     let requestSubscriptionMeansState = false;
-    const getReadWorkState = () => readWorkState;
-    const runWithReadModeOn = (job) => {
-        readWorkState = true;
-        job();
-        readWorkState = false;
-        requestSubscriptionMeansState = false;
-    };
-    const setSubscriptionMeansRequested = () => {
+    const runWithSubscriptionMeansRequested = (job) => {
         requestSubscriptionMeansState = true;
+        const toReturn = job();
+        requestSubscriptionMeansState = false;
+        return toReturn;
     };
     const getRequestSubscriptionMeansState = () => requestSubscriptionMeansState;
     const resetReadWorkMode = () => {
-        readWorkState = false;
         requestSubscriptionMeansState = false;
     };
     return {
-        getReadWorkState,
-        runWithReadModeOn,
-        setSubscriptionMeansRequested,
+        runWithSubscriptionMeansRequested,
         getRequestSubscriptionMeansState,
         resetReadWorkMode,
     };

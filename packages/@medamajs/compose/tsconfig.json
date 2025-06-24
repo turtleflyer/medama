@@ -3,7 +3,10 @@
   "compilerOptions": {
     "paths": {
       "medama": [
-        "../../medama/src/index.ts"
+        "../../medama/src"
+      ],
+      "medama/queue-and-selector-management": [
+        "../../medama/src/queue-and-selector-management"
       ]
     },
     "rootDirs": [

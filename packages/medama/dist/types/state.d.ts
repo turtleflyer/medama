@@ -1,19 +1,13 @@
-import type { ReadState, Selector, SetState } from './medama.types';
-import type { SelectorTrigger } from './selectorStore';
-type UnregisterTriggerFromKeyHandle = () => void;
-export type KeyHandle = (runImmediately: () => void, selectorTrigger: SelectorTrigger) => UnregisterTriggerFromKeyHandle;
+import type { Selector, SetState } from './medama.types';
+import { type SelectorTrigger } from './queue-and-selector-management';
+export type KeyHandle = (runImmediately: () => void, selectorTrigger: SelectorTrigger) => () => void;
 export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
-export type RegisterSelectorTrigger<State extends object> = (selectorTrigger: () => void) => ReadState<State>;
-export type RunOverState<State extends object, V> = (selector: Selector<State, V>, keyHandleCollector?: KeyHandleCollector) => V;
-export declare const createStateImage: <State extends object>(initState?: Partial<State>) => {
-    runOverState: RunOverState<State, unknown>;
+export type RunOverState<State extends object> = <V>(selector: Selector<State, V>, keyHandleCollector?: KeyHandleCollector) => V;
+type StateImageMethods<State extends object> = {
+    runOverState: RunOverState<State>;
     setState: SetState<State>;
+    resetQueue: () => void;
 };
-type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
-type RunQueue = () => void;
-export declare const createJobQueue: () => {
-    addToQueue: AddToQueue;
-    runQueue: RunQueue;
-};
+export declare const createStateImage: <State extends object>(initState?: Partial<State>) => StateImageMethods<State>;
 export {};
 //# sourceMappingURL=state.d.ts.map

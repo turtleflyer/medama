@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createJobQueue = exports.createStateImage = void 0;
+exports.createStateImage = void 0;
+const queue_and_selector_management_1 = require("./queue-and-selector-management");
 const selectStateEntriesChanged_1 = require("./selectStateEntriesChanged");
 const createStateImage = (initState) => {
     let calculationAllowed = false;
@@ -22,7 +23,7 @@ const createStateImage = (initState) => {
         return toReturn;
     };
     const triggerJobStore = Object.create(null);
-    const { addToQueue, runQueue } = (0, exports.createJobQueue)();
+    const { addToQueue, processQueue, resetQueue } = (0, queue_and_selector_management_1.createJobQueue)();
     const createKeyHandleRecord = () => {
         const immediateTaskSet = new Set();
         const triggerSet = new Set();
@@ -38,7 +39,9 @@ const createStateImage = (initState) => {
             immediateTaskSet.forEach((task) => {
                 task();
             });
-            addToQueue(triggerSet);
+            triggerSet.forEach((trigger) => {
+                addToQueue(trigger);
+            });
         };
         return { keyHandle, fireKey };
     };
@@ -52,7 +55,7 @@ const createStateImage = (initState) => {
                 (state[selectStateEntriesChanged_1._STATE_ENTRIES_CHANGED] = stateEntriesChanged);
             return mergeToState;
         });
-        runQueue();
+        processQueue();
         return toReturn;
     };
     const proxyHandler = {
@@ -82,23 +85,7 @@ const createStateImage = (initState) => {
     };
     const stateTargetObject = Object.defineProperty(Object.assign(Object.create(null), initState), selectStateEntriesChanged_1._STATE_ENTRIES_CHANGED, { value: Object.create(null), writable: true });
     const state = new Proxy(stateTargetObject, proxyHandler);
-    return { runOverState, setState };
+    return { runOverState, setState, resetQueue };
 };
 exports.createStateImage = createStateImage;
-const createJobQueue = () => {
-    let queue = [];
-    const addToQueue = (triggerSet) => {
-        triggerSet.forEach(({ trigger, isToAdd }) => {
-            isToAdd() && queue.push(trigger);
-        });
-    };
-    const runQueue = () => {
-        queue.forEach((trigger) => {
-            trigger();
-        });
-        queue = [];
-    };
-    return { addToQueue, runQueue };
-};
-exports.createJobQueue = createJobQueue;
 //# sourceMappingURL=state.js.map

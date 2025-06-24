@@ -1,10 +1,8 @@
-export type SelectorTrigger = {
-    trigger: () => void;
-    isToAdd: () => boolean;
-};
+import type { SelectorTrigger } from './selectorRecord';
+type AddToQueue = (selectorTrigger: SelectorTrigger) => void;
 type JobQueueMethods = {
+    addToQueue: AddToQueue;
     processQueue: () => void;
-    addToQueue: (selectorTrigger: SelectorTrigger) => void;
     resetQueue: () => void;
 };
 export declare const createJobQueue: () => JobQueueMethods;

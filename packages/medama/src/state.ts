@@ -1,29 +1,45 @@
-import type { ReadState, Selector, SetState } from './medama.types';
-import type { SelectorTrigger } from './selectorStore';
+import type { Selector, SetState } from './medama.types';
+import { createJobQueue, type SelectorTrigger } from './queue-and-selector-management';
 import { _STATE_ENTRIES_CHANGED, type StateEntriesChangedKey } from './selectStateEntriesChanged';
-
-type UnregisterTriggerFromKeyHandle = () => void;
 
 /**
  * Function to register a selector's trigger with a state property.
  *
- * @param runImmediately Callback to mark the selector as needing recalculation when the property changes.
- * @param trigger Callback to execute when the property changes (typically triggers selector re-evaluation and subscriptions).
+ * @param runImmediately Callback to mark the selector as needing recalculation
+ * when the property changes.
+ * @param selectorTrigger The SelectorTrigger instance to be registered for the
+ * property. Determines the logic to execute when the property changes.
  * @returns Cleanup function to unregister both callbacks from the property.
  */
 export type KeyHandle = (
   runImmediately: () => void,
   selectorTrigger: SelectorTrigger
-) => UnregisterTriggerFromKeyHandle;
+) => () => void;
 
+/**
+ * Collects KeyHandle instances for properties accessed during selector
+ * execution. Used to track dependencies between selectors and state properties.
+ * Passed to RunOverState to gather all relevant KeyHandles.
+ *
+ * @param keyHandle The KeyHandle instance for a property accessed during
+ * selector execution.
+ */
 export type KeyHandleCollector = (keyHandle: KeyHandle) => void;
 
-export type RegisterSelectorTrigger<State extends object> = (
-  selectorTrigger: () => void
-) => ReadState<State>;
-
+/**
+ * Internal structure for managing the registration and invocation of callbacks
+ * for a state property. Used to coordinate dependency tracking and trigger
+ * logic for each property.
+ */
 type KeyHandleRecord = {
+  /**
+   * Function to register a selector's trigger with a state property.
+   */
   keyHandle: KeyHandle;
+
+  /**
+   * Invokes all registered callbacks for the property when its value changes.
+   */
   fireKey: () => void;
 };
 
@@ -47,10 +63,47 @@ type WithStateEntriesChanged<State extends object> = State & {
   [_STATE_ENTRIES_CHANGED]: Partial<State>;
 };
 
-export type RunOverState<State extends object, V> = (
+/**
+ * Executes a selector function over the state, optionally collecting property
+ * dependencies. Used for dependency tracking and controlled state access during
+ * selector evaluation.
+ *
+ * @template State - The type of the state object.
+ * @template V - The return type of the selector.
+ * @param selector The selector function to execute over the state.
+ * @param keyHandleCollector Optional collector to register property
+ * dependencies accessed during selector execution.
+ * @returns The result of the selector function.
+ */
+export type RunOverState<State extends object> = <V>(
   selector: Selector<State, V>,
   keyHandleCollector?: KeyHandleCollector
 ) => V;
+
+/**
+ * Core methods for managing state access, updates, and subscription queues.
+ * Provides controlled access to state through selectors and managed updates.
+ */
+type StateImageMethods<State extends object> = {
+  /**
+   * Executes a selector function over the state, optionally collecting property
+   * dependencies. Used for dependency tracking and controlled state access
+   * during selector evaluation.
+   */
+  runOverState: RunOverState<State>;
+
+  /**
+   * Function to update state with partial changes. Accepts either direct state
+   * changes or setter function. Ensures type safety of state updates.
+   */
+  setState: SetState<State>;
+
+  /**
+   * Clears the queue of pending subscription triggers. Used during
+   * initialization and error handling.
+   */
+  resetQueue: () => void;
+};
 
 /**
  * Creates core state management system with controlled access and subscription
@@ -65,10 +118,7 @@ export type RunOverState<State extends object, V> = (
  */
 export const createStateImage = <State extends object>(
   initState?: Partial<State>
-): {
-  runOverState: RunOverState<State, unknown>;
-  setState: SetState<State>;
-} => {
+): StateImageMethods<State> => {
   let calculationAllowed = false;
 
   /**
@@ -106,17 +156,7 @@ export const createStateImage = <State extends object>(
    */
   let activeKeyHandleCollector: KeyHandleCollector | undefined;
 
-  /**
-   * Executes selector over state with dependency tracking.
-   * - Sets active key handle collector for dependency tracking
-   * - Runs selector with authorized access to state properties
-   * - Resets collector after execution
-   *
-   * @param selector Function to run over state
-   * @param keyHandleCollector Optional collector for registering dependencies
-   * @returns Result of selector execution
-   */
-  const runOverState: RunOverState<State, unknown> = (selector, keyHandleCollector?) => {
+  const runOverState: RunOverState<State> = (selector, keyHandleCollector?) => {
     activeKeyHandleCollector = keyHandleCollector;
     const toReturn = runWithRestrictionLifted(() => selector(state));
     activeKeyHandleCollector = undefined;
@@ -125,18 +165,10 @@ export const createStateImage = <State extends object>(
   };
 
   const triggerJobStore: Partial<Record<keyof State, KeyHandleRecord>> = Object.create(null);
-  const { addToQueue, runQueue } = createJobQueue();
+  const { addToQueue, processQueue, resetQueue } = createJobQueue();
 
   /**
    * Creates a record to manage triggers for a state property.
-   * - keyHandle: Registers callbacks for when the property changes. These include:
-   *   - runImmediately: Marks dependent selectors as needing recalculation.
-   *   - trigger: Notifies selectors/subscribers of the property change.
-   *   Returns a cleanup function to unregister both callbacks.
-   * - fireKey: Invoked when the property value changes. It:
-   *   - Calls all runImmediately callbacks to mark selectors as stale.
-   *   - Queues all trigger callbacks for batched execution (avoiding duplicate runs).
-   *   This ensures efficient and correct propagation of state changes to all dependents.
    */
   const createKeyHandleRecord = (): KeyHandleRecord => {
     const immediateTaskSet = new Set<() => void>();
@@ -157,7 +189,9 @@ export const createStateImage = <State extends object>(
         task();
       });
 
-      addToQueue(triggerSet);
+      triggerSet.forEach((trigger) => {
+        addToQueue(trigger);
+      });
     };
 
     return { keyHandle, fireKey };
@@ -165,19 +199,15 @@ export const createStateImage = <State extends object>(
 
   /**
    * Stores the set of state entries that have changed during a state update.
-   * This is used to support the selector `selectStateEntriesChanged` by exposing
-   * the changed entries through the state key `_STATE_ENTRIES_CHANGED`.
+   * This is used to support the selector `selectStateEntriesChanged` by
+   * exposing the changed entries through the state key
+   * `_STATE_ENTRIES_CHANGED`.
    */
   let stateEntriesChanged: Partial<State>;
 
   /**
-   * Updates state with new values and triggers subscriptions.
-   * - Accepts either partial state object or state updater function
-   * - Runs update with authorized access to state properties
-   * - Executes all queued subscription triggers after update
-   *
-   * @param stateChange Partial state object or updater function
-   * @returns Applied state changes
+   * Updates state with new values and processes subscription triggers. Handles
+   * both direct value updates and updater functions.
    */
   const setState: SetState<State> = (stateChange) => {
     const toReturn = runWithRestrictionLifted(() => {
@@ -196,7 +226,7 @@ export const createStateImage = <State extends object>(
       return mergeToState;
     });
 
-    runQueue();
+    processQueue();
 
     return toReturn;
   };
@@ -239,8 +269,9 @@ export const createStateImage = <State extends object>(
 
       if (!Object.is(oldValue, newValue)) {
         /**
-         * When a state property is changed and the value is different, record the change
-         * in stateEntriesChanged for later processing and trigger all registered callbacks.
+         * When a state property is changed and the value is different, record
+         * the change in stateEntriesChanged for later processing and trigger
+         * all registered callbacks.
          */
         Object.prototype.propertyIsEnumerable.call(target, p) &&
           (stateEntriesChanged[p as K & keyof State] = newValue as State[K & keyof State]);
@@ -266,41 +297,5 @@ export const createStateImage = <State extends object>(
    */
   const state = new Proxy(stateTargetObject, proxyHandler);
 
-  return { runOverState, setState };
-};
-
-type AddToQueue = (triggerSet: Set<SelectorTrigger>) => void;
-
-type RunQueue = () => void;
-
-/**
- * Creates a queue system to manage selector trigger execution.
- * - Queue is populated when state properties change via Proxy's set handler
- * - Relies on the inner mechanism of the selector trigger (`isToAdd`) to
- *   determine whether the trigger method should be added to the queue, ensuring
- *   no duplicate executions
- * - Provides methods to add triggers and process the entire queue
- * - Clears the queue after processing all triggers
- */
-export const createJobQueue = (): {
-  addToQueue: AddToQueue;
-  runQueue: RunQueue;
-} => {
-  let queue: (() => void)[] = [];
-
-  const addToQueue: AddToQueue = (triggerSet) => {
-    triggerSet.forEach(({ trigger, isToAdd }) => {
-      isToAdd() && queue.push(trigger);
-    });
-  };
-
-  const runQueue: RunQueue = () => {
-    queue.forEach((trigger) => {
-      trigger();
-    });
-
-    queue = [];
-  };
-
-  return { addToQueue, runQueue };
+  return { runOverState, setState, resetQueue };
 };

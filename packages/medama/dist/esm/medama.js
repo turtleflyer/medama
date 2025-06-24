@@ -3,17 +3,12 @@ import { createStateImage } from './state';
 export const createMedama = (initState) => {
     let state = createStateImage(initState);
     let selectorStore = createSelectorStore(state.runOverState);
-    let flagSubscriptionInProgress = false;
-    let flagStateUpdating = false;
     const resetInit = () => {
-        flagSubscriptionInProgress = false;
-        flagStateUpdating = false;
+        state.resetQueue();
     };
     const subscribeToState = (selector, subscription) => {
         try {
-            flagSubscriptionInProgress = true;
             const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
-            flagSubscriptionInProgress = false;
             return toReturn;
         }
         catch (e) {
@@ -32,13 +27,7 @@ export const createMedama = (initState) => {
     };
     const setState = (stateChange) => {
         try {
-            if (flagSubscriptionInProgress)
-                throw new Error('Medama Error: The state update occurs during a subscription');
-            if (flagStateUpdating)
-                throw new Error('Medama Error: A subscription job launches the state update');
-            flagStateUpdating = true;
             const toReturn = state.setState(stateChange);
-            flagStateUpdating = false;
             return toReturn;
         }
         catch (e) {

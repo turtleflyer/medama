@@ -16,6 +16,11 @@
       "import": "./dist/esm/index.js",
       "types": "./dist/types/index.d.ts"
     },
+    "./queue-and-selector-management": {
+      "require": "./dist/cjs/queue-and-selector-management/index.js",
+      "import": "./dist/esm/queue-and-selector-management/index.js",
+      "types": "./dist/types/queue-and-selector-management/index.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
