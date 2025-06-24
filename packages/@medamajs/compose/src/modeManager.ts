@@ -247,6 +247,8 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
     );
   };
 
+  let subscriptionRegistered = false;
+
   const createDeferrer: CreateDeferrer = (deferJob, resolveDeferred) => {
     let subscribed = false;
 
@@ -257,7 +259,10 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
 
         if (subscribed) return;
 
+        subscriptionRegistered = true;
+
         subscribeForResolvingWhenSignalled((): void => {
+          subscriptionRegistered = false;
           resolveDeferred();
           subscribed = false;
         });
@@ -283,7 +288,7 @@ export const createUpdateWorkModeManager = (): UpdateWorkModeMethods => {
     let unsubscribeSignalTrigger: (() => void) | undefined;
 
     const signalTrigger = () => () => {
-      updateWorkState || setSignalState({ signal: {} });
+      !updateWorkState && subscriptionRegistered && setSignalState({ signal: {} });
     };
 
     const subscribeAndManageDeferring: SubscribeAndManageDeferring = (selector, subscription) => {
