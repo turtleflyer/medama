@@ -11,8 +11,7 @@ const createMedama = (initState) => {
     };
     const subscribeToState = (selector, subscription) => {
         try {
-            const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
-            return toReturn;
+            return selectorStore.subscribeToStateInSelectorStore(selector, subscription);
         }
         catch (e) {
             resetInit();
@@ -30,8 +29,7 @@ const createMedama = (initState) => {
     };
     const setState = (stateChange) => {
         try {
-            const toReturn = state.setState(stateChange);
-            return toReturn;
+            return state.setState(stateChange);
         }
         catch (e) {
             resetInit();

@@ -35,9 +35,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
     subscription: Subscription<V>
   ): SubscriptionMethods<State, V> => {
     try {
-      const toReturn = selectorStore.subscribeToStateInSelectorStore(selector, subscription);
-
-      return toReturn;
+      return selectorStore.subscribeToStateInSelectorStore(selector, subscription);
     } catch (e) {
       resetInit();
 
@@ -57,9 +55,7 @@ export const createMedama: CreateMedama = <State extends object>(initState?: Par
 
   const setState: SetState<State> = (stateChange) => {
     try {
-      const toReturn = state.setState(stateChange);
-
-      return toReturn;
+      return state.setState(stateChange);
     } catch (e) {
       resetInit();
 
