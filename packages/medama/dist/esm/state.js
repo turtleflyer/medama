@@ -24,12 +24,12 @@ export const createStateImage = (initState) => {
     const createKeyHandleRecord = () => {
         const immediateTaskSet = new Set();
         const triggerSet = new Set();
-        const keyHandle = (runImmediately, trigger) => {
+        const keyHandle = (runImmediately, selectorTrigger) => {
             immediateTaskSet.add(runImmediately);
-            triggerSet.add(trigger);
+            triggerSet.add(selectorTrigger);
             return () => {
                 immediateTaskSet.delete(runImmediately);
-                triggerSet.delete(trigger);
+                triggerSet.delete(selectorTrigger);
             };
         };
         const fireKey = () => {

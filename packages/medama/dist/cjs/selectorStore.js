@@ -56,22 +56,21 @@ const createSubscriptionManagementForSelector = (selector, runOverState) => {
     let collectedKeyHandles;
     let unsubscribeChunks;
     const keyHandleCollector = (keyHandle) => {
-        collectedKeyHandles !== null && collectedKeyHandles !== void 0 ? collectedKeyHandles : (collectedKeyHandles = new Set());
-        collectedKeyHandles.add(keyHandle);
+        (collectedKeyHandles !== null && collectedKeyHandles !== void 0 ? collectedKeyHandles : (collectedKeyHandles = new Set())).add(keyHandle);
     };
     const calculateValue = () => runOverState(selector, collectedKeyHandles ? undefined : keyHandleCollector);
     const manageSubscriptions = (immediateTask, selectorTrigger) => {
         const unsubscribeChunksIsToPopulate = !unsubscribeChunks;
-        unsubscribeChunks !== null && unsubscribeChunks !== void 0 ? unsubscribeChunks : (unsubscribeChunks = []);
-        collectedKeyHandles === null || collectedKeyHandles === void 0 ? void 0 : collectedKeyHandles.forEach((handle) => {
-            const unsubscribeCallback = handle(immediateTask, selectorTrigger);
-            unsubscribeChunksIsToPopulate && (unsubscribeChunks === null || unsubscribeChunks === void 0 ? void 0 : unsubscribeChunks.push(unsubscribeCallback));
+        collectedKeyHandles === null || collectedKeyHandles === void 0 ? void 0 : collectedKeyHandles.forEach((keyHandle) => {
+            const unsubscribeCallback = keyHandle(immediateTask, selectorTrigger);
+            unsubscribeChunksIsToPopulate && (unsubscribeChunks !== null && unsubscribeChunks !== void 0 ? unsubscribeChunks : (unsubscribeChunks = [])).push(unsubscribeCallback);
         });
     };
     const unsubscribe = () => {
         unsubscribeChunks === null || unsubscribeChunks === void 0 ? void 0 : unsubscribeChunks.forEach((unsubscribe) => {
             unsubscribe();
         });
+        unsubscribeChunks = undefined;
     };
     return { calculateValue, manageSubscriptions, unsubscribe };
 };

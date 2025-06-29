@@ -66,17 +66,9 @@ test('createJobQueue works correctly', () => {
   selectorTrigger3.trigger.mock.calls = [];
 
   processQueue();
-  expect(
-    [selectorTrigger1, selectorTrigger2, selectorTrigger3].some(
-      ({
-        trigger: {
-          mock: {
-            calls: { length },
-          },
-        },
-      }) => length > 0
-    )
-  ).toBe(true);
+  expect(selectorTrigger1.trigger).toHaveBeenCalledTimes(0);
+  expect(selectorTrigger2.trigger).toHaveBeenCalledTimes(0);
+  expect(selectorTrigger3.trigger).toHaveBeenCalledTimes(0);
 
   selectorTrigger1.trigger.mock.calls = [];
   selectorTrigger2.trigger.mock.calls = [];

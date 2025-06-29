@@ -41,22 +41,31 @@ type JobQueueMethods = {
  */
 export const createJobQueue = (): JobQueueMethods => {
   let jobQueue: (() => void)[] = [];
+  let queueInProgress = false;
+
+  const resetQueue = (): void => {
+    jobQueue = [];
+    queueInProgress = false;
+  };
 
   const addToQueue: AddToQueue = ({ trigger, isToAdd }) => {
     isToAdd() && jobQueue.push(trigger);
   };
 
   const processQueue = (): void => {
+    if (queueInProgress) return;
+
+    queueInProgress = true;
     let toRun: (() => void) | undefined;
 
-    do {
-      toRun?.();
-      toRun = jobQueue.shift();
-    } while (toRun);
-  };
-
-  const resetQueue = (): void => {
-    jobQueue = [];
+    try {
+      do {
+        toRun?.();
+        toRun = jobQueue.shift();
+      } while (toRun);
+    } finally {
+      resetQueue();
+    }
   };
 
   return { processQueue, addToQueue, resetQueue };

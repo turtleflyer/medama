@@ -174,13 +174,13 @@ export const createStateImage = <State extends object>(
     const immediateTaskSet = new Set<() => void>();
     const triggerSet = new Set<SelectorTrigger>();
 
-    const keyHandle: KeyHandle = (runImmediately, trigger) => {
+    const keyHandle: KeyHandle = (runImmediately, selectorTrigger) => {
       immediateTaskSet.add(runImmediately);
-      triggerSet.add(trigger);
+      triggerSet.add(selectorTrigger);
 
       return (): void => {
         immediateTaskSet.delete(runImmediately);
-        triggerSet.delete(trigger);
+        triggerSet.delete(selectorTrigger);
       };
     };
 

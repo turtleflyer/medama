@@ -186,8 +186,7 @@ const createSubscriptionManagementForSelector = <State extends object, V>(
   let unsubscribeChunks: UnsubscribeFromState[] | undefined;
 
   const keyHandleCollector: KeyHandleCollector = (keyHandle) => {
-    collectedKeyHandles ??= new Set();
-    collectedKeyHandles.add(keyHandle);
+    (collectedKeyHandles ??= new Set()).add(keyHandle);
   };
 
   const calculateValue = () =>
@@ -199,11 +198,10 @@ const createSubscriptionManagementForSelector = <State extends object, V>(
 
   const manageSubscriptions = (immediateTask: () => void, selectorTrigger: SelectorTrigger) => {
     const unsubscribeChunksIsToPopulate = !unsubscribeChunks;
-    unsubscribeChunks ??= [];
 
-    collectedKeyHandles?.forEach((handle) => {
-      const unsubscribeCallback = handle(immediateTask, selectorTrigger);
-      unsubscribeChunksIsToPopulate && unsubscribeChunks?.push(unsubscribeCallback);
+    collectedKeyHandles?.forEach((keyHandle) => {
+      const unsubscribeCallback = keyHandle(immediateTask, selectorTrigger);
+      unsubscribeChunksIsToPopulate && (unsubscribeChunks ??= []).push(unsubscribeCallback);
     });
   };
 
@@ -211,6 +209,8 @@ const createSubscriptionManagementForSelector = <State extends object, V>(
     unsubscribeChunks?.forEach((unsubscribe): void => {
       unsubscribe();
     });
+
+    unsubscribeChunks = undefined;
   };
 
   return { calculateValue, manageSubscriptions, unsubscribe };
