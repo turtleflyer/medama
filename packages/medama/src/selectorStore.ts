@@ -99,26 +99,50 @@ export const createSelectorStore = <State extends object>(
     subscription: Subscription<V>
   ) => {
     let currentSelector = selector;
-    let unsubscribeHandle: UnsubscribeFromState | null = null;
+    let unsubscribeHandle: UnsubscribeFromState | undefined;
     let currentRevealedSubscriptionJob: SubscriptionJob<V>;
 
     const evaluateAndSubscribe = (subscriptionToReveal: Subscription<V>): void => {
       const { addSubscription, getValue } = getSelectorRecord(currentSelector);
-      const possibleSubscriptionJob = subscriptionToReveal(getValue());
+
+      /**
+       * Indicates if the subscription job was triggered immediately during
+       * subscription setup. This happens if setState is called as part of the
+       * subscription, causing the job to fire before the actual subscription
+       * job is assigned. For this reason, we initially subscribe with a
+       * placeholder function, then replace it with the real job once available.
+       */
+      let beenCalledPrematurely = false;
+
+      let subscriptionPlaceholder: (v: V) => void = () => {
+        beenCalledPrematurely = true;
+      };
+
+      unsubscribeHandle = addSubscription((v) => subscriptionPlaceholder(v));
+      const potentialSubscriptionJob = subscriptionToReveal(getValue());
 
       currentRevealedSubscriptionJob =
-        typeof possibleSubscriptionJob === 'function'
-          ? possibleSubscriptionJob
+        typeof potentialSubscriptionJob === 'function'
+          ? potentialSubscriptionJob
           : subscriptionToReveal;
 
-      unsubscribeHandle = addSubscription(currentRevealedSubscriptionJob);
+      /**
+       * Replace the placeholder with the actual subscription job.
+       */
+      subscriptionPlaceholder = currentRevealedSubscriptionJob;
+
+      /**
+       * If the job was triggered prematurely, run it now with the current
+       * value.
+       */
+      if (beenCalledPrematurely) currentRevealedSubscriptionJob(getValue());
     };
 
     evaluateAndSubscribe(subscription);
 
     const unsubscribe: UnsubscribeFromState = () => {
       unsubscribeHandle?.();
-      unsubscribeHandle = null;
+      unsubscribeHandle = undefined;
     };
 
     const resubscribe: Resubscribe<V> = (subscriptionToResubscribe) => {

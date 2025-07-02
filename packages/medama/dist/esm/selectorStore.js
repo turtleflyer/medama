@@ -19,21 +19,28 @@ export const createSelectorStore = (runOverState) => {
     };
     const subscribeToStateInSelectorStore = (selector, subscription) => {
         let currentSelector = selector;
-        let unsubscribeHandle = null;
+        let unsubscribeHandle;
         let currentRevealedSubscriptionJob;
         const evaluateAndSubscribe = (subscriptionToReveal) => {
             const { addSubscription, getValue } = getSelectorRecord(currentSelector);
-            const possibleSubscriptionJob = subscriptionToReveal(getValue());
+            let beenCalledPrematurely = false;
+            let subscriptionPlaceholder = () => {
+                beenCalledPrematurely = true;
+            };
+            unsubscribeHandle = addSubscription((v) => subscriptionPlaceholder(v));
+            const potentialSubscriptionJob = subscriptionToReveal(getValue());
             currentRevealedSubscriptionJob =
-                typeof possibleSubscriptionJob === 'function'
-                    ? possibleSubscriptionJob
+                typeof potentialSubscriptionJob === 'function'
+                    ? potentialSubscriptionJob
                     : subscriptionToReveal;
-            unsubscribeHandle = addSubscription(currentRevealedSubscriptionJob);
+            subscriptionPlaceholder = currentRevealedSubscriptionJob;
+            if (beenCalledPrematurely)
+                currentRevealedSubscriptionJob(getValue());
         };
         evaluateAndSubscribe(subscription);
         const unsubscribe = () => {
             unsubscribeHandle === null || unsubscribeHandle === void 0 ? void 0 : unsubscribeHandle();
-            unsubscribeHandle = null;
+            unsubscribeHandle = undefined;
         };
         const resubscribe = (subscriptionToResubscribe) => {
             unsubscribe();

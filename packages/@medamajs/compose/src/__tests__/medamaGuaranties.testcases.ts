@@ -2329,5 +2329,45 @@ export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
       expect(subscription2).toHaveBeenCalledTimes(1);
       expect(subscription3).toHaveBeenCalledTimes(1);
     });
+
+    test('self-firing is allowed in composition', () => {
+      const { setState, subscribeToState } = composeMedama(
+        { a: createMedama() },
+        { a: { b: 500 } }
+      );
+
+      let testValue: number[] = [];
+
+      const { resubscribe, transfer } = subscribeToState(
+        ({ a: { b } }) => b,
+
+        () => (v) => {
+          testValue.push(v);
+
+          if (v === 0) return;
+
+          setState({ a: { b: v - 1 } });
+        }
+      );
+
+      expect(testValue).toEqual([]);
+
+      setState({ a: { b: 5 } });
+      expect(testValue).toEqual([5, 4, 3, 2, 1, 0]);
+
+      testValue = [];
+      resubscribe((v) => {
+        testValue.push(v);
+
+        if (v === 5) return;
+
+        setState({ a: { b: v + 1 } });
+      });
+      expect(testValue).toEqual([0, 1, 2, 3, 4, 5]);
+
+      testValue = [];
+      transfer(({ a: { b } }) => Math.floor(b / 2));
+      expect(testValue).toEqual([2, 1, 1]);
+    });
   });
 };

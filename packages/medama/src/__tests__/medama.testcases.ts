@@ -1984,6 +1984,43 @@ export const medamaTest = (
       expect(subscription3).toHaveBeenCalledTimes(1);
     });
 
+    test('self-firing is allowed in composition', () => {
+      const { setState, subscribeToState } = createMedama({ b: 500 });
+
+      let testValue: number[] = [];
+
+      const { resubscribe, transfer } = subscribeToState(
+        ({ b }) => b,
+
+        () => (v) => {
+          testValue.push(v);
+
+          if (v === 0) return;
+
+          setState({ b: v - 1 });
+        }
+      );
+
+      expect(testValue).toEqual([]);
+
+      setState({ b: 5 });
+      expect(testValue).toEqual([5, 4, 3, 2, 1, 0]);
+
+      testValue = [];
+      resubscribe((v) => {
+        testValue.push(v);
+
+        if (v === 5) return;
+
+        setState({ b: v + 1 });
+      });
+      expect(testValue).toEqual([0, 1, 2, 3, 4, 5]);
+
+      testValue = [];
+      transfer(({ b }) => Math.floor(b / 2));
+      expect(testValue).toEqual([2, 1, 1]);
+    });
+
     test('selectStateEntriesChanged works properly', () => {
       type State = { 1: number; b: number; [symbKey]: number };
 
