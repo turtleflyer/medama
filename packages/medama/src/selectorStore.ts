@@ -119,7 +119,17 @@ export const createSelectorStore = <State extends object>(
       };
 
       unsubscribeHandle = addSubscription((v) => subscriptionPlaceholder(v));
-      const potentialSubscriptionJob = subscriptionToReveal(getValue());
+      // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+      let potentialSubscriptionJob: SubscriptionJob<V> | void;
+
+      try {
+        potentialSubscriptionJob = subscriptionToReveal(getValue());
+      } catch (E) {
+        unsubscribeHandle();
+        unsubscribeHandle = undefined;
+
+        throw E;
+      }
 
       currentRevealedSubscriptionJob =
         typeof potentialSubscriptionJob === 'function'

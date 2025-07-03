@@ -31,7 +31,15 @@ const createSelectorStore = (runOverState) => {
                 beenCalledPrematurely = true;
             };
             unsubscribeHandle = addSubscription((v) => subscriptionPlaceholder(v));
-            const potentialSubscriptionJob = subscriptionToReveal(getValue());
+            let potentialSubscriptionJob;
+            try {
+                potentialSubscriptionJob = subscriptionToReveal(getValue());
+            }
+            catch (E) {
+                unsubscribeHandle();
+                unsubscribeHandle = undefined;
+                throw E;
+            }
             currentRevealedSubscriptionJob =
                 typeof potentialSubscriptionJob === 'function'
                     ? potentialSubscriptionJob

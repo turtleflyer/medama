@@ -12,7 +12,7 @@ import type {
 export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
   const symbKey = Symbol('symbKey');
 
-  describe('general medama layers tests', () => {
+  describe('medama pupil guaranties testcases for medama layers', () => {
     test('methods inside pupil are identical to the plain methods', () => {
       const methods = composeMedama<{ a: object; b: object }>({
         a: createMedama(),
@@ -1069,6 +1069,39 @@ export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
       setState({ a: { foo: 50 } });
       expect(testValue).toBe(123);
       expect(subscriptionWithInit).toHaveBeenCalledTimes(0);
+      expect(subscription).toHaveBeenCalledTimes(0);
+    });
+
+    test('unsubscribing already unsubscribed job is safe', () => {
+      const { subscribeToState, setState } = composeMedama(
+        { a: createMedama(), b: createMedama() },
+        { a: { foo: 10 }, b: { bar: 20 } }
+      );
+
+      const subscription = jest.fn(() => {});
+
+      const { unsubscribe } = subscribeToState(({ a, b }) => a.foo + b.bar, subscription);
+
+      expect(subscription).toHaveBeenCalledTimes(1);
+
+      subscription.mock.calls = [];
+      setState({ a: { foo: 100 } });
+      expect(subscription).toHaveBeenCalledTimes(1);
+
+      subscription.mock.calls = [];
+      unsubscribe();
+      expect(subscription).toHaveBeenCalledTimes(0);
+
+      subscription.mock.calls = [];
+      setState({ a: { foo: 50 } });
+      expect(subscription).toHaveBeenCalledTimes(0);
+
+      subscription.mock.calls = [];
+      unsubscribe();
+      expect(subscription).toHaveBeenCalledTimes(0);
+
+      subscription.mock.calls = [];
+      setState({ a: { foo: 60 } });
       expect(subscription).toHaveBeenCalledTimes(0);
     });
 
@@ -2368,6 +2401,26 @@ export const medamaGuarantiesTest = (composeMedama: ComposeMedama) => {
       testValue = [];
       transfer(({ a: { b } }) => Math.floor(b / 2));
       expect(testValue).toEqual([2, 1, 1]);
+    });
+
+    test('handling errors when subscribing does not leave bad state', () => {
+      const { subscribeToState, setState } = composeMedama(
+        { foo: createMedama() },
+        { foo: { a: 1 } }
+      );
+
+      const subscription = jest.fn(() => {
+        throw Error();
+      });
+
+      expect(() => {
+        subscribeToState(({ foo: { a } }) => a, subscription);
+      }).toThrow();
+      expect(subscription).toHaveBeenCalledTimes(1);
+
+      subscription.mock.calls = [];
+      setState({ foo: { a: 2 } });
+      expect(subscription).toHaveBeenCalledTimes(0);
     });
   });
 };

@@ -1,4 +1,6 @@
 import { createMedama, selectStateEntriesChanged } from '..';
-import { medamaTest } from './medama.testcases';
+import { medamaGuarantiesTest } from './medamaGuaranties.testcases';
+import { medamaSpecificTest } from './medamaSpecific.testcases';
 
-medamaTest(createMedama, selectStateEntriesChanged);
+medamaGuarantiesTest(createMedama);
+medamaSpecificTest(createMedama, selectStateEntriesChanged);

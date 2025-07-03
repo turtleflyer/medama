@@ -1,5 +1,7 @@
 // @ts-expect-error build package without type declarations
 import { createMedama, selectStateEntriesChanged } from '../../dist/cjs';
-import { medamaTest } from './medama.testcases';
+import { medamaGuarantiesTest } from './medamaGuaranties.testcases';
+import { medamaSpecificTest } from './medamaSpecific.testcases';
 
-medamaTest(createMedama, selectStateEntriesChanged);
+medamaGuarantiesTest(createMedama);
+medamaSpecificTest(createMedama, selectStateEntriesChanged);
